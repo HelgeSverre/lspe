@@ -26,14 +26,8 @@ At small doses, not much happens. Turn it up and the model starts losing the
 plot. So far, simply raising the temperature produces more useful variety than
 tampering with the model's hidden state.
 
-That is still a result. The point is not to collect screenshots of a chatbot
-saying weird stuff and call it consciousness. The point is to run the joke as a
-real, reproducible experiment—and accept the answer even when the machine does
-not see God.
-
-> To be painfully clear: this is not a biological simulation of psilocybin, the
-> model is not conscious, and this proves nothing about human evolution. It is a
-> controlled experiment inspired by an extremely entertaining idea.
+That is still a result. The point is to run the joke as a real, reproducible
+experiment—and accept the answer even when the machine does not see God.
 
 ## The experiment
 
