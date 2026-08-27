@@ -1,22 +1,39 @@
 # LSPE
 
-### What happens if you give an LLM magic mushrooms?
+## I gave an LLM magic mushrooms. For science.
 
-That deliberately provocative question is where this project started.
+Not real mushrooms. An LLM has no mouth.
 
-While reading about Terence McKenna's *stoned ape hypothesis*, I became
-interested in its less literal idea: an altered state would not need to install
-intelligence directly to matter. By loosening familiar cognitive pathways, it
-might expose unusual associations; attempts to communicate and preserve those
-experiences could then feed back into language, culture, and future minds.
+Instead, I cracked open a local language model and messed with its brain while
+it was generating text.
 
-LSPE asks whether a small piece of that idea can be tested in a machine. If we
-transiently disturb a language model's internal state, can it enter a coherent,
-usefully different computational regime—or do we merely damage the signal?
+The idea came from the **stoned ape hypothesis**: the wonderfully unhinged
+theory that psychedelic mushrooms helped kick-start human language, imagination,
+and culture. There is no good evidence that mushrooms created the human mind—but
+it raises a fantastic question:
 
-> **LSPE does not simulate psilocybin, prove anything about human evolution, or
-> imply that a model is conscious or intoxicated.** "Giving an LLM mushrooms"
-> is the inspiration and the hook; latent-state perturbation is the experiment.
+> What if temporarily scrambling a mind can make it think in genuinely new ways?
+
+So that is what this project tests.
+
+I inject a controlled disturbance directly into the LLM's internal activations
+and hold it there while the model responds. Then I check whether it becomes more
+creative, merely more random, or just completely fried.
+
+The early verdict: **mostly fried.**
+
+At small doses, not much happens. Turn it up and the model starts losing the
+plot. So far, simply raising the temperature produces more useful variety than
+tampering with the model's hidden state.
+
+That is still a result. The point is not to collect screenshots of a chatbot
+saying weird stuff and call it consciousness. The point is to run the joke as a
+real, reproducible experiment—and accept the answer even when the machine does
+not see God.
+
+> To be painfully clear: this is not a biological simulation of psilocybin, the
+> model is not conscious, and this proves nothing about human evolution. It is a
+> controlled experiment inspired by an extremely entertaining idea.
 
 ## The experiment
 
