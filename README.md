@@ -96,6 +96,17 @@ randomness and broken inference:
 The desired output is not a gallery of amusing hallucinations. It is a
 reproducible answer—even when the answer is "no."
 
+## Where this goes next
+
+The current experiment perturbs one residual stream. A more ambitious follow-up
+will test something closer to the motivating idea: temporarily weakening the
+model's normal functional boundaries and increasing communication between
+normally separated groups of attention heads.
+
+That protocol is specified in [NETWORK_DESEGREGATION_SPEC.md](NETWORK_DESEGREGATION_SPEC.md).
+It cannot begin until this experiment is formally closed, and it treats later
+fine-tuning as integration after the altered state—not as the drug itself.
+
 ## Setup
 
 ```bash
