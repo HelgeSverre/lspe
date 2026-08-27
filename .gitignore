@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.Python
+
+# Virtual environments and package tooling
+.venv/
+venv/
+env/
+.uv/
+
+# Test, type-checker, and linter caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build and packaging output
+build/
+dist/
+*.egg-info/
+
+# Local editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Generated experiment artifacts can be hundreds of megabytes. Runs are local,
+# content-addressed evidence and can be rebuilt from the tracked protocol.
+runs/*
+!runs/.gitkeep
+
+# Local model caches, downloads, and credentials
+models/
+checkpoints/
+.cache/
+.env
+.env.*
+!.env.example
+*.safetensors
+*.gguf
+*.bin

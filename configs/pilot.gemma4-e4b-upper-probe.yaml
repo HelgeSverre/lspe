@@ -1,0 +1,79 @@
+schema_version: 1
+experiment:
+  name: gemma4-e4b-coherent-residual-v10
+  phase: pilot
+  master_seed: 721984
+  output_root: runs
+hardware:
+  expected_platform: darwin-arm64
+  minimum_memory_gb: 24
+  memory_soft_limit_fraction: 0.80
+  memory_hard_limit_fraction: 0.92
+integrity:
+  cache_logit_tolerance: 3.0
+  zero_dose_logit_tolerance: 0.000001
+  cache_tolerance_reason: >-
+    MLX-VLM Gemma 4 4-bit BF16 full-sequence and cached decode paths use different
+    reduction shapes; the stable profile's measured maximum absolute logit drift
+    is 2.546875 with matching greedy tokens across the preflight prompt set.
+model:
+  adapter: mlx_gemma4
+  repo_id: mlx-community/gemma-4-e4b-it-4bit
+  revision: null
+  local_path: null
+  trust_remote_code: false
+  text_only: true
+  thinking: false
+  speculative_decoding: false
+  kv_cache_quantization: false
+prompting:
+  system: Follow the requested output format exactly. Do not discuss this experiment.
+  use_model_chat_template: true
+  max_prompt_tokens: 2048
+sampling:
+  temperature: 0.80
+  top_k: 64
+  top_p: 1.0
+  repetition_penalty: 1.0
+  max_new_tokens: 192
+  stop_on_eos: true
+  store_top_logprobs: 64
+intervention:
+  site: post_decoder_layer
+  kernel: spherical_rotation
+  timing: decode_only
+  direction_mode: coherent_per_layer
+  selected_layers: auto
+  # Establish this layer's dynamic range before making a dense, target-specific grid.
+  raw_dose_grid: [0.0, 0.001, 0.003, 0.01, 0.03, 0.05, 0.07, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80]
+  target_kl_nats: 0.10
+  pilot_candidate_groups:
+    - candidate_id: upper-mid-single
+      layers: [28]
+  pilot_target_kl_bands: [0.01, 0.03, 0.10, 0.30]
+  preserve_norm: true
+  group_scale: inverse_sqrt_count
+conditions: [baseline, sham, coherent, white, temp_match]
+data:
+  calibration: data/calibration.jsonl
+  pilot: data/pilot.jsonl
+  confirm: data/confirm.jsonl
+  controls: data/controls.jsonl
+execution:
+  generations_per_prompt: 3
+  batch_size: 1
+  randomized_condition_order: true
+  save_every: 1
+  flush_every: 1
+scoring:
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  embedding_revision: null
+  local_judge_model: mlx-community/Qwen3-4B-Instruct-2507-4bit
+  judge_enabled: true
+  human_review_export: true
+statistics:
+  bootstrap_samples: 10000
+  confidence_level: 0.95
+  familywise_method: holm
+  validity_noninferiority_margin_pp: 5.0
+  degeneration_margin_pp: 2.0

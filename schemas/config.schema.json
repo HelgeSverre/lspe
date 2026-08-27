@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LSPE configuration",
+  "type": "object",
+  "required": ["schema_version", "experiment", "hardware", "model", "prompting", "sampling", "intervention", "conditions", "data", "execution", "scoring", "statistics"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "experiment": {"type": "object"},
+    "hardware": {"type": "object"},
+    "integrity": {"type": "object"},
+    "model": {"type": "object"},
+    "prompting": {"type": "object"},
+    "sampling": {"type": "object"},
+    "intervention": {"type": "object"},
+    "conditions": {"type": "array", "minItems": 1},
+    "data": {"type": "object"},
+    "execution": {"type": "object"},
+    "scoring": {"type": "object"},
+    "statistics": {"type": "object"}
+  },
+  "additionalProperties": false
+}

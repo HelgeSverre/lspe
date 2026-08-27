@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LSPE prompt record",
+  "type": "object",
+  "required": ["schema_version", "prompt_id", "split", "task_type", "system_variant", "prompt", "response_schema", "validator", "expected", "tags"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "prompt_id": {"type": "string", "minLength": 1},
+    "split": {"enum": ["calibration", "pilot", "confirm", "controls"]},
+    "task_type": {"type": "string", "minLength": 1},
+    "system_variant": {"type": "string", "minLength": 1},
+    "prompt": {"type": "string", "minLength": 1},
+    "response_schema": {"type": "string", "minLength": 1},
+    "validator": {"type": "string", "minLength": 1},
+    "expected": {},
+    "tags": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

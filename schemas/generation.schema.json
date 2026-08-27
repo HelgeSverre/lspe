@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LSPE generation record",
+  "type": "object",
+  "required": ["generation_id", "prompt_id", "prompt_hash", "model_repo", "model_revision", "condition", "generation_index", "layer_indices", "kernel", "dose", "direction_mode", "sampling_seed", "sampling", "output_token_ids", "output_text", "stop_reason", "validator", "runtime_duration_seconds", "failure_code"],
+  "properties": {
+    "generation_id": {"type": "string", "pattern": "^sha256:"},
+    "prompt_id": {"type": "string"},
+    "prompt_hash": {"type": "string"},
+    "model_repo": {"type": "string"},
+    "model_revision": {"type": "string"},
+    "condition": {"enum": ["baseline", "sham", "coherent", "white", "temp_match"]},
+    "generation_index": {"type": "integer", "minimum": 0},
+    "layer_indices": {"type": "array", "items": {"type": "integer"}},
+    "kernel": {"type": "string"},
+    "dose": {"type": "number"},
+    "direction_mode": {"type": "string"},
+    "sampling_seed": {"type": "integer"},
+    "sampling": {"type": "object"},
+    "output_token_ids": {"type": "array", "items": {"type": "integer"}},
+    "output_text": {"type": "string"},
+    "stop_reason": {"type": "string"},
+    "validator": {"type": "object"},
+    "runtime_duration_seconds": {"type": "number", "minimum": 0},
+    "failure_code": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}
