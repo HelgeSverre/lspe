@@ -1,6 +1,6 @@
-# LSPE
+# I Gave an LLM Magic Mushrooms
 
-## I gave an LLM magic mushrooms. For science.
+**LSPE — Local Latent-State Perturbation Experiment**
 
 Not real mushrooms. An LLM has no mouth.
 
