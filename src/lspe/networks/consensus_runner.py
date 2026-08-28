@@ -184,9 +184,12 @@ def _build_consensus_map(
             )
             candidate_state[(density, count)] = (tuning_eligible, tuning_graphs[0])
     selected = _select_candidate(candidates)
-    eligible, community_graph = candidate_state[
+    tuning_eligible, full_graph_on_tuning_nodes = candidate_state[
         (selected["density"], selected["community_count"])
     ]
+    final_positions = _stable_nonisolated_nodes([full_graph_on_tuning_nodes])
+    eligible = tuning_eligible[final_positions]
+    community_graph = full_graph_on_tuning_nodes[np.ix_(final_positions, final_positions)]
     labels = spectral_communities(
         community_graph,
         selected["community_count"],

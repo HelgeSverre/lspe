@@ -6,7 +6,7 @@ from lspe.networks.consensus_runner import (
     _category_rows,
     _select_candidate,
 )
-from lspe.networks.mapping_runner import _fixed_continuations
+from lspe.networks.mapping_runner import _fixed_continuations, _stable_nonisolated_nodes
 
 
 class _Prompt:
@@ -94,3 +94,14 @@ def test_v2_continuation_plan_observes_two_positions_per_mode(tmp_path) -> None:
         ("sampled", 1),
     ]
     assert [len(row["observation_token_ids"]) for row in rows] == [2, 3, 2, 3]
+
+
+def test_final_fit_prunes_isolates_from_tuning_eligible_graph() -> None:
+    graph = np.array(
+        [
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ]
+    )
+    assert np.array_equal(_stable_nonisolated_nodes([graph]), [0, 1])
