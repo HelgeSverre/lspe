@@ -105,8 +105,22 @@ def random_basis_transform(
     """Place a selective transform's eigenvalue gains in a frozen random basis."""
 
     matrix = np.asarray(correlation, dtype=np.float64)
-    selective = selective_flattening_transform(matrix, alpha, eigenvalue_ranks)
-    gains = np.linalg.eigvalsh(selective)
+    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("Correlation must be square")
+    if not np.isfinite(matrix).all() or not np.allclose(matrix, matrix.T, atol=1e-10):
+        raise ValueError("Correlation must be finite and symmetric")
+    if alpha < 0.0:
+        raise ValueError("Random-basis alpha must be non-negative")
+    invalid = sorted(eigenvalue_ranks - set(range(matrix.shape[0])))
+    if invalid:
+        raise ValueError(f"Invalid eigenvalue ranks: {invalid}")
+    eigenvalues = np.linalg.eigvalsh(matrix)
+    if np.min(eigenvalues) <= 0.0:
+        raise ValueError("Correlation must be positive definite")
+    gains = np.ones_like(eigenvalues)
+    selected = np.array(sorted(eigenvalue_ranks), dtype=np.int64)
+    if selected.size:
+        gains[selected] = eigenvalues[selected] ** (-alpha / 2.0)
     rng = np.random.default_rng(seed)
     basis, triangular = np.linalg.qr(rng.normal(size=matrix.shape))
     signs = np.where(np.diag(triangular) < 0.0, -1.0, 1.0)

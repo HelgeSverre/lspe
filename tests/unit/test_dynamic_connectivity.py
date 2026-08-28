@@ -64,6 +64,13 @@ def test_random_basis_preserves_selective_transform_spectrum() -> None:
     assert np.allclose(random, random.T)
 
 
+def test_random_basis_control_allows_super_whitening() -> None:
+    transform = random_basis_transform(
+        np.array([[1.0, 0.4], [0.4, 1.0]]), 2.0, frozenset({0}), seed=12
+    )
+    assert np.max(np.linalg.eigvalsh(transform)) > 1.0
+
+
 def test_attention_noise_rejects_negative_sigma() -> None:
     with pytest.raises(ValueError, match="non-negative"):
         AttentionNoiseController(frozenset({1}), -0.1, 3)

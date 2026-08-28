@@ -48,8 +48,8 @@ class BehavioralProtocol:
     base_temperature: float = 0.80
     top_k: int = 64
     top_p: float = 1.0
-    random_alphas: tuple[float, ...] = (0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80)
-    noise_sigmas: tuple[float, ...] = (0.01, 0.02, 0.04, 0.07, 0.10, 0.15, 0.22, 0.32)
+    random_alphas: tuple[float, ...] = (0.80, 1.00, 1.25, 1.50, 2.00, 2.50, 3.00)
+    noise_sigmas: tuple[float, ...] = (0.32, 0.40, 0.50, 0.65, 0.80, 1.00, 1.30)
     control_relative_kl_tolerance: float = 0.25
     temperature_entropy_tolerance: float = 0.02
     pilot_validity_margin: float = 0.15
@@ -70,7 +70,7 @@ def run_behavioral_experiment(
     run_dir: Path,
     offline: bool = True,
     protocol: BehavioralProtocol | None = None,
-    protocol_document: Path = Path("SCCF_BEHAVIORAL_SPEC.md"),
+    protocol_document: Path = Path("SCBE_CONTROL_MATCH_AMENDMENT.md"),
 ) -> dict[str, Any]:
     """Calibrate controls, run pilot, and run confirmation only if its gate passes."""
 
