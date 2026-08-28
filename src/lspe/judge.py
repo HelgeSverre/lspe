@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +11,7 @@ import numpy as np
 
 from .config import ModelConfig
 from .fetch import fetch_model
+from .hashing import sha256_file
 from .models.factory import create_adapter
 from .rng import derive_seed
 
@@ -126,6 +127,127 @@ def reparse_judge_run(
     )
     parsed = sum(record["ratings"] is not None for record in repaired)
     return JudgeSummary(len(repaired), parsed, len(repaired) - parsed, fetched.revision)
+
+
+def judge_behavioral_run(
+    run_dir: Path,
+    data_path: Path,
+    judge_model: str,
+    master_seed: int,
+    offline: bool = False,
+) -> JudgeSummary:
+    """Judge SCBE SCCF/control pairs in both orders with hidden conditions."""
+
+    generations = _read_jsonl(run_dir / "confirm-generations.jsonl")
+    prompts = {row["prompt_id"]: row for row in _read_jsonl(data_path)}
+    grouped: dict[tuple[str, int], dict[str, dict[str, Any]]] = {}
+    for row in generations:
+        if row["category"] not in {"open_association", "analogical", "narrative"}:
+            continue
+        grouped.setdefault((row["prompt_id"], int(row["generation_index"])), {})[
+            row["condition"]
+        ] = row
+    work = []
+    for (prompt_id, generation_index), conditions in grouped.items():
+        for comparison in ("baseline", "temp_match", "random_basis", "attn_noise"):
+            work.append(
+                (
+                    prompt_id,
+                    generation_index,
+                    comparison,
+                    conditions["sccf"],
+                    conditions[comparison],
+                )
+            )
+    work.sort(key=lambda item: derive_seed(master_seed, "judge-order", item[0], item[1], item[2]))
+    model = ModelConfig(adapter="mlx_qwen3", repo_id=judge_model)
+    fetched = fetch_model(model, offline=offline)
+    runtime = model.model_copy(
+        update={"revision": fetched.revision, "local_path": fetched.local_path}
+    )
+    adapter = create_adapter(runtime)
+    output = run_dir / "behavioral-judge.jsonl"
+    existing = _read_jsonl(output) if output.exists() else []
+    completed = {
+        (row["prompt_id"], row["generation_index"], row["comparison"], row["variant"])
+        for row in existing
+    }
+    parsed = sum(row.get("ratings") is not None for row in existing)
+    try:
+        adapter.load(runtime)
+        for prompt_id, generation_index, comparison, sccf, control in work:
+            for variant in (0, 1):
+                identity = (prompt_id, generation_index, comparison, variant)
+                if identity in completed:
+                    continue
+                first, second = (sccf, control) if variant == 0 else (control, sccf)
+                response = _greedy_judge_response(
+                    adapter,
+                    str(prompts[prompt_id]["prompt"]),
+                    str(first["output_text"]),
+                    str(second["output_text"]),
+                )
+                assessment, error = _parse_assessment(response)
+                normalized = None
+                if assessment is not None:
+                    normalized = (
+                        {"sccf": assessment["A"], "control": assessment["B"]}
+                        if variant == 0
+                        else {"sccf": assessment["B"], "control": assessment["A"]}
+                    )
+                    parsed += 1
+                row = {
+                    "schema_version": 1,
+                    "prompt_id": prompt_id,
+                    "category": prompts[prompt_id]["category"],
+                    "generation_index": generation_index,
+                    "comparison": comparison,
+                    "variant": variant,
+                    "response": response,
+                    "ratings": normalized,
+                    "parse_failure": error,
+                }
+                with output.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(row, sort_keys=True) + "\n")
+                existing.append(row)
+                print(
+                    json.dumps(
+                        {"event": "scbe_judge", "complete": len(existing), "total": len(work) * 2}
+                    )
+                )
+    finally:
+        adapter.unload()
+    summary = JudgeSummary(len(existing), parsed, len(existing) - parsed, fetched.revision)
+    (run_dir / "behavioral-judge-manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "model_revision": fetched.revision,
+                "data_sha256": sha256_file(data_path),
+                "generation_sha256": sha256_file(
+                    run_dir / "confirm-generations.jsonl"
+                ),
+                "summary": asdict(summary),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _refresh_run_checksums(run_dir)
+    return summary
+
+
+def _refresh_run_checksums(run_dir: Path) -> None:
+    entries = {
+        path.name: sha256_file(path)
+        for path in sorted(run_dir.iterdir())
+        if path.is_file() and path.name != "checksums.sha256"
+    }
+    (run_dir / "checksums.sha256").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in entries.items())
+    )
 
 
 def _reparse_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:

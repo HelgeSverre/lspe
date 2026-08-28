@@ -2,11 +2,13 @@ import numpy as np
 import pytest
 
 from lspe.networks.dynamic_connectivity import (
+    AttentionNoiseController,
     apply_flattening,
     effective_rank,
     flattening_transform,
     matrix_similarity,
     mean_absolute_off_diagonal,
+    random_basis_transform,
     regularized_head_correlation,
     selective_flattening_transform,
     standardize_attention_rows,
@@ -52,6 +54,19 @@ def test_selective_flattening_changes_only_selected_eigenmode() -> None:
 def test_selective_flattening_rejects_invalid_mode() -> None:
     with pytest.raises(ValueError, match="Invalid eigenvalue ranks"):
         selective_flattening_transform(np.eye(3), 0.4, frozenset({3}))
+
+
+def test_random_basis_preserves_selective_transform_spectrum() -> None:
+    correlation = np.array([[1.0, 0.4], [0.4, 1.0]])
+    selective = selective_flattening_transform(correlation, 0.5, frozenset({0}))
+    random = random_basis_transform(correlation, 0.5, frozenset({0}), seed=12)
+    assert np.allclose(np.linalg.eigvalsh(random), np.linalg.eigvalsh(selective))
+    assert np.allclose(random, random.T)
+
+
+def test_attention_noise_rejects_negative_sigma() -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        AttentionNoiseController(frozenset({1}), -0.1, 3)
 
 
 def test_matrix_similarity_uses_edges_not_diagonal() -> None:

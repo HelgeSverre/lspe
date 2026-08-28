@@ -96,6 +96,86 @@ def selective_flattening_transform(
     return 0.5 * (transform + transform.T)
 
 
+def random_basis_transform(
+    correlation: np.ndarray,
+    alpha: float,
+    eigenvalue_ranks: frozenset[int],
+    seed: int,
+) -> np.ndarray:
+    """Place a selective transform's eigenvalue gains in a frozen random basis."""
+
+    matrix = np.asarray(correlation, dtype=np.float64)
+    selective = selective_flattening_transform(matrix, alpha, eigenvalue_ranks)
+    gains = np.linalg.eigvalsh(selective)
+    rng = np.random.default_rng(seed)
+    basis, triangular = np.linalg.qr(rng.normal(size=matrix.shape))
+    signs = np.where(np.diag(triangular) < 0.0, -1.0, 1.0)
+    basis = basis * signs
+    transform = (basis * gains) @ basis.T
+    return 0.5 * (transform + transform.T)
+
+
+@dataclass
+class AttentionNoiseController:
+    """Add deterministic independent score noise and restore per-head moments."""
+
+    selected_layers: frozenset[int]
+    sigma: float
+    seed: int
+    minimum_keys: int = 8
+    maximum_mean_error: float = 0.0
+    maximum_scale_error: float = 0.0
+    nonfinite_count: int = 0
+    zero_variance_count: int = 0
+    _rng: np.random.Generator = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.sigma < 0.0:
+            raise ValueError("Attention-noise sigma must be non-negative")
+        self._rng = np.random.default_rng(self.seed)
+
+    def has_effect(self, layer_index: int) -> bool:
+        return layer_index in self.selected_layers and self.sigma > 0.0
+
+    def apply_mlx(self, layer_index: int, scores: Any) -> Any:
+        if (
+            layer_index not in self.selected_layers
+            or self.sigma == 0.0
+            or scores.shape[-2] != 1
+            or scores.shape[-1] < self.minimum_keys
+        ):
+            return scores
+        mx = __import__("mlx.core", fromlist=["array"])
+        values = scores.astype(mx.float32)
+        means = mx.mean(values, axis=-1, keepdims=True)
+        scales = mx.sqrt(mx.mean(mx.square(values - means), axis=-1, keepdims=True))
+        standardized = (values - means) / mx.maximum(scales, 1e-6)
+        noise = mx.array(self._rng.normal(size=scores.shape), dtype=mx.float32)
+        mixed = standardized + self.sigma * noise
+        mixed_means = mx.mean(mixed, axis=-1, keepdims=True)
+        mixed_scales = mx.sqrt(mx.mean(mx.square(mixed - mixed_means), axis=-1, keepdims=True))
+        restored = (mixed - mixed_means) / mx.maximum(mixed_scales, 1e-6) * scales + means
+        restored_means = mx.mean(restored, axis=-1, keepdims=True)
+        restored_scales = mx.sqrt(
+            mx.mean(mx.square(restored - restored_means), axis=-1, keepdims=True)
+        )
+        mx.eval(restored, restored_means, restored_scales, scales, mixed_scales)
+        arrays = [np.asarray(value) for value in (restored, restored_means, restored_scales)]
+        if not all(np.isfinite(value).all() for value in arrays):
+            self.nonfinite_count += 1
+            raise RuntimeError("Non-finite attention-noise output")
+        self.zero_variance_count += int(np.sum(np.asarray(mixed_scales) < 1e-6))
+        self.maximum_mean_error = max(
+            self.maximum_mean_error,
+            float(np.max(np.abs(np.asarray(restored_means) - np.asarray(means)))),
+        )
+        self.maximum_scale_error = max(
+            self.maximum_scale_error,
+            float(np.max(np.abs(np.asarray(restored_scales) - np.asarray(scales)))),
+        )
+        return restored.astype(scores.dtype)
+
+
 def apply_flattening(
     scores: np.ndarray, transform: np.ndarray, epsilon: float = 1e-6
 ) -> np.ndarray:

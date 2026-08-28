@@ -17,9 +17,12 @@ from .doctor import inspect_environment, report_dict
 from .execution import ExperimentRunner
 from .fetch import fetch_model
 from .human_review import export_human_review
-from .judge import judge_run, reparse_judge_run
+from .judge import judge_behavioral_run, judge_run, reparse_judge_run
 from .locking import create_experiment_lock, load_experiment_lock, write_experiment_lock
 from .models.factory import create_adapter
+from .networks.behavioral_analysis import analyze_behavioral_experiment
+from .networks.behavioral_data import build_behavioral_datasets
+from .networks.behavioral_runner import run_behavioral_experiment
 from .networks.consensus_closeout import (
     close_out_consensus_v2,
     reevaluate_consensus_heldout,
@@ -136,6 +139,17 @@ def build_dynamic_data(
     _event(event="dynamic_dataset_built", output=str(output), count=count)
 
 
+@app.command("build-behavioral-data")
+def build_behavioral_data(
+    output: Annotated[Path, typer.Option("--output")] = Path("data/phase4"),
+    force: Annotated[bool, typer.Option("--force")] = False,
+) -> None:
+    """Build the frozen fresh SCBE calibration and behavioral corpora."""
+
+    counts = build_behavioral_datasets(output, force=force)
+    _event(event="behavioral_datasets_built", output=str(output), counts=counts)
+
+
 @app.command("map-dynamic-connectivity")
 def map_dynamic_connectivity(
     config: ConfigOption,
@@ -213,6 +227,63 @@ def selective_connectivity(
         offline=offline,
     )
     _event(event="selective_connectivity_complete", run=str(output), result=result)
+
+
+@app.command("run-connectivity-behavior")
+def connectivity_behavior(
+    config: ConfigOption,
+    map_run: Annotated[Path, typer.Option("--map-run", exists=True, file_okay=False)],
+    sccf_run: Annotated[Path, typer.Option("--sccf-run", exists=True, file_okay=False)],
+    data_root: Annotated[Path, typer.Option("--data-root", exists=True, file_okay=False)] = Path(
+        "data/phase4"
+    ),
+    output: Annotated[Path, typer.Option("--output")] = Path("runs/scbe-qwen3"),
+    offline: Annotated[bool, typer.Option("--offline")] = True,
+) -> None:
+    """Run SCBE control matching, pilot, and gated confirmation generation."""
+
+    result = run_behavioral_experiment(
+        model_config=config,
+        data_root=data_root,
+        map_run=map_run,
+        sccf_run=sccf_run,
+        run_dir=output,
+        offline=offline,
+    )
+    _event(event="connectivity_behavior_complete", run=str(output), result=result)
+
+
+@app.command("judge-connectivity-behavior")
+def judge_connectivity_behavior(
+    run: RunOption,
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase4/confirm.jsonl"
+    ),
+    judge_model: Annotated[str, typer.Option("--judge-model")] = (
+        "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+    ),
+    offline: Annotated[bool, typer.Option("--offline")] = True,
+) -> None:
+    """Run the frozen blinded SCBE secondary judge."""
+
+    summary = judge_behavioral_run(run, data, judge_model, 84_120_771, offline)
+    _event(event="connectivity_behavior_judged", run=str(run), summary=asdict(summary))
+
+
+@app.command("analyze-connectivity-behavior")
+def analyze_connectivity_behavior(
+    run: RunOption,
+    data_root: Annotated[Path, typer.Option("--data-root", exists=True, file_okay=False)] = Path(
+        "data/phase4"
+    ),
+    embedding_model: Annotated[str, typer.Option("--embedding-model")] = (
+        "sentence-transformers/all-MiniLM-L6-v2"
+    ),
+) -> None:
+    """Score and analyze the completed SCBE confirmation."""
+
+    result = analyze_behavioral_experiment(run, data_root, embedding_model)
+    _event(event="connectivity_behavior_analyzed", run=str(run), result=result)
 
 
 @app.command("map-networks")

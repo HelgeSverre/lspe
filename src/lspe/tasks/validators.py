@@ -36,6 +36,8 @@ def validate_response(validator: str, text: str, expected: Any = None) -> Valida
             return _constrained_creative(text, expected)
         case "python_function":
             return _python_function(text, expected)
+        case "bounded_prose":
+            return _bounded_prose(text, expected)
         case _:
             return ValidationResult(False, f"UNKNOWN_VALIDATOR:{validator}", None)
 
@@ -128,6 +130,17 @@ def _constrained_creative(text: str, expected: Any) -> ValidationResult:
     if any(str(word).casefold() not in joined for word in required):
         return ValidationResult(False, "MISSING_REQUIRED_WORD", None)
     return ValidationResult(True, None, lines)
+
+
+def _bounded_prose(text: str, expected: Any) -> ValidationResult:
+    if not isinstance(expected, dict):
+        return ValidationResult(False, "MISSING_WORD_BOUNDS", None)
+    minimum = int(expected.get("minimum_words", 0))
+    maximum = int(expected.get("maximum_words", 0))
+    words = text.strip().split()
+    if minimum <= len(words) <= maximum:
+        return ValidationResult(True, None, text.strip())
+    return ValidationResult(False, "WORD_COUNT_OUT_OF_BOUNDS", None)
 
 
 def _python_function(text: str, expected: Any) -> ValidationResult:

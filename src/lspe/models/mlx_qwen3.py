@@ -256,7 +256,9 @@ class MlxQwen3Adapter:
                 return getattr(self.base, name)
 
             def __call__(self, x: Any, mask: Any = None, cache: Any = None) -> Any:
-                if cache is None:
+                # Decode-only transformers must not replace multi-token prefill:
+                # a zero attention bias would otherwise discard its causal mask.
+                if cache is None or x.shape[1] != 1:
                     return self.base(x, mask=mask, cache=cache)
                 batch, length, _ = x.shape
                 queries = self.base.q_proj(x)
