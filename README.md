@@ -169,6 +169,24 @@ support a stronger claim.
 See [SCCF_REPORT.md](SCCF_REPORT.md) and
 [SELECTIVE_CAUSAL_CONNECTIVITY_SPEC.md](SELECTIVE_CAUSAL_CONNECTIVITY_SPEC.md).
 
+### Did it change complete answers?
+
+Yes—but the behavioral pilot stopped it from becoming a creativity claim.
+
+After matching SCCF against random-basis, attention-noise, and temperature
+controls, SCBE generated 432 paired full responses. The intervention clearly
+changed behavior and raised uncertainty while keeping most open-ended responses
+valid. However, exact-answer instruction following fell from 100% to 75%, past
+the frozen competence margin. Confirmation data remained untouched.
+
+The failures returned the correct fact with forbidden extra wording (`12 sides`
+instead of exactly `12`), so this was loss of precision and obedience rather
+than hallucinated knowledge. That distinction is interesting, but it still
+means the behavioral experiment failed its safety gate.
+
+See [SCBE_REPORT.md](SCBE_REPORT.md) and
+[SCCF_BEHAVIORAL_SPEC.md](SCCF_BEHAVIORAL_SPEC.md).
+
 ## Setup
 
 ```bash

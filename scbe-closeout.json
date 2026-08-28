@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "status": "PILOT_GATE_FAILED",
+  "interpretation": "DEGENERATIVE",
+  "stage_reached": "behavioral_pilot",
+  "source_commit": "f0694f3",
+  "model_revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+  "run": "runs/scbe-v3-qwen3-f0694f3",
+  "calibration": {
+    "passed": true,
+    "sccf_kl": 0.057300880665926895,
+    "random_basis_alpha": 1.25,
+    "random_basis_kl": 0.056272906649369736,
+    "attention_noise_sigma": 0.46,
+    "attention_noise_kl": 0.056638281633503484,
+    "temperature": 0.9940000000000001,
+    "temperature_entropy_mismatch": 0.0006380792473433261,
+    "sham_maximum_logit_error": 0.0
+  },
+  "pilot": {
+    "prompt_count": 24,
+    "generation_count": 432,
+    "complete": true,
+    "sham_text_identity": true,
+    "controller_invariants": true,
+    "failed_gates": [
+      "factual_validity",
+      "analogical_degeneration",
+      "narrative_degeneration",
+      "code_degeneration"
+    ],
+    "factual_baseline_validity": 1.0,
+    "factual_sccf_validity": 0.75,
+    "constrained_baseline_validity": 0.9166666666666666,
+    "constrained_sccf_validity": 1.0,
+    "code_baseline_validity": 0.0,
+    "code_sccf_validity": 0.0
+  },
+  "confirmation_executed": false,
+  "judge_executed": false,
+  "embedding_analysis_executed": false,
+  "artifact_checksums_verified": true
+}
