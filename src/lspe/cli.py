@@ -21,6 +21,7 @@ from .judge import judge_run, reparse_judge_run
 from .locking import create_experiment_lock, load_experiment_lock, write_experiment_lock
 from .models.factory import create_adapter
 from .networks.mapping_runner import MappingProtocol, run_functional_mapping
+from .networks.mapping_sensitivity import run_nested_mapping_sensitivity
 from .pilot_selection import select_pilot_candidate, select_pilot_matrix
 from .preflight import (
     baseline_generation_sanity,
@@ -128,6 +129,14 @@ def map_networks(
         offline=offline,
     )
     _event(event="functional_mapping_complete", run=str(output), result=result["result"])
+
+
+@app.command("map-sensitivity")
+def map_sensitivity(run: RunOption) -> None:
+    """Run nested mapping-only sensitivity without behavioral outcomes."""
+
+    result = run_nested_mapping_sensitivity(run)
+    _event(event="mapping_sensitivity_complete", run=str(run), result=result)
 
 
 @app.command()
