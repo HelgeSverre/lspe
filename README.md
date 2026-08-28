@@ -125,6 +125,28 @@ This is a useful failure: throwing more data and stricter analysis at the idea
 made the answer clearer, and prevented a fragile clustering from being dressed
 up as evidence that the model's “brain networks” were desegregated.
 
+### The dynamic attempt
+
+The next experiment dropped static communities entirely. Dynamic Connectivity
+Flattening measured head-to-head attention correlations over full token
+trajectories, then temporarily flattened those relationships during decoding.
+
+This mechanism finally worked. The dynamic maps reproduced at `0.9998` on
+untouched prompts, zero dose was exactly identical to baseline, and calibrated
+transforms reduced attention-head correlation while sharply increasing
+effective rank.
+
+But there was no safe active dose. At `alpha=0.40`, top-1 retention passed at
+`80.30%` while output KL remained below the active band. At `alpha=0.42`, KL
+entered the band while retention slipped to `79.51%`. A frozen denser-grid
+follow-up confirmed the crossover, so behavioral testing did not proceed.
+
+See [DCF_REPORT.md](DCF_REPORT.md) and
+[DYNAMIC_CONNECTIVITY_SPEC.md](DYNAMIC_CONNECTIVITY_SPEC.md). This is the first
+version that demonstrably created the intended desynchronized internal regime;
+the remaining problem is making that regime selective enough not to cross the
+damage line as soon as it meaningfully affects output.
+
 ## Setup
 
 ```bash
