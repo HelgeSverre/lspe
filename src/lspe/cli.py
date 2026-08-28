@@ -26,6 +26,7 @@ from .networks.consensus_closeout import (
 )
 from .networks.consensus_runner import run_consensus_mapping
 from .networks.dynamic_data import build_dynamic_map_dataset
+from .networks.dynamic_runner import run_dynamic_mapping
 from .networks.mapping_closeout import close_out_mapping_failure, verify_mapping_checksums
 from .networks.mapping_runner import MappingProtocol, run_functional_mapping
 from .networks.mapping_sensitivity import run_nested_mapping_sensitivity
@@ -128,6 +129,23 @@ def build_dynamic_data(
 
     count = build_dynamic_map_dataset(output, force=force)
     _event(event="dynamic_dataset_built", output=str(output), count=count)
+
+
+@app.command("map-dynamic-connectivity")
+def map_dynamic_connectivity(
+    config: ConfigOption,
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase3/dynamic_map.jsonl"
+    ),
+    output: Annotated[Path, typer.Option("--output")] = Path("runs/dcf-map-qwen3"),
+    offline: Annotated[bool, typer.Option("--offline")] = True,
+) -> None:
+    """Run the frozen DCF trajectory mapping and stability gate."""
+
+    result = run_dynamic_mapping(
+        model_config=config, data_path=data, run_dir=output, offline=offline
+    )
+    _event(event="dynamic_mapping_complete", run=str(output), result=result["result"])
 
 
 @app.command("map-networks")

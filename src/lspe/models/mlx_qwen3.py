@@ -22,6 +22,7 @@ class MlxQwen3Adapter:
         self._original_layers: list[Any] | None = None
         self._original_output_projections: dict[int, Any] = {}
         self._original_attentions: dict[int, Any] = {}
+        self._original_transform_attentions: dict[int, Any] = {}
 
     def load(self, spec: Any) -> None:
         mlx_lm = import_module("mlx_lm", "mlx-lm")
@@ -39,6 +40,7 @@ class MlxQwen3Adapter:
         self._architecture, self._layers_path = self._discover_architecture()
 
     def unload(self) -> None:
+        self.unwrap_attention_transformer()
         self.unwrap_attention_observer()
         self.unwrap_layers()
         self.model = None
@@ -224,6 +226,95 @@ class MlxQwen3Adapter:
         for layer_index, projection in self._original_output_projections.items():
             layers[layer_index].self_attn.o_proj = projection
         self._original_output_projections.clear()
+
+    def wrap_attention_transformer(
+        self, transformer: Any, selected_layers: frozenset[int]
+    ) -> None:
+        """Replace cached decode attention with an inspectable score transformation."""
+
+        if self.model is None or self._layers_path is None:
+            raise RuntimeUnavailableError("Adapter is not loaded")
+        if self._original_transform_attentions or self._original_attentions:
+            raise RuntimeError("Attention modules are already wrapped")
+        parent, attribute = self._layer_parent_and_attribute()
+        layers = list(getattr(parent, attribute))
+        invalid = sorted(selected_layers - set(range(len(layers))))
+        if invalid:
+            raise ValueError(f"Attention transformer selected invalid layers: {invalid}")
+        mlx_nn = import_module("mlx.nn", "mlx")
+        mx = import_module("mlx.core", "mlx")
+
+        class TransformedAttention(mlx_nn.Module):
+            def __init__(self, base: Any, layer_index: int) -> None:
+                super().__init__()
+                self.base = base
+                self.layer_index = layer_index
+
+            def __getattr__(self, name: str) -> Any:
+                if name in {"base", "layer_index"}:
+                    return super().__getattr__(name)
+                return getattr(self.base, name)
+
+            def __call__(self, x: Any, mask: Any = None, cache: Any = None) -> Any:
+                if cache is None:
+                    return self.base(x, mask=mask, cache=cache)
+                batch, length, _ = x.shape
+                queries = self.base.q_proj(x)
+                keys = self.base.k_proj(x)
+                values = self.base.v_proj(x)
+                queries = self.base.q_norm(
+                    queries.reshape(batch, length, self.base.n_heads, -1)
+                ).transpose(0, 2, 1, 3)
+                keys = self.base.k_norm(
+                    keys.reshape(batch, length, self.base.n_kv_heads, -1)
+                ).transpose(0, 2, 1, 3)
+                values = values.reshape(
+                    batch, length, self.base.n_kv_heads, -1
+                ).transpose(0, 2, 1, 3)
+                queries = self.base.rope(queries, offset=cache.offset)
+                keys = self.base.rope(keys, offset=cache.offset)
+                keys, values = cache.update_and_fetch(keys, values)
+                repeats = self.base.n_heads // self.base.n_kv_heads
+                expanded_keys = mx.repeat(keys, repeats, axis=1)
+                scores = (
+                    queries @ expanded_keys.transpose(0, 1, 3, 2)
+                ) * self.base.scale
+                if isinstance(mask, str) and mask != "causal":
+                    raise RuntimeError(f"Unsupported cached attention mask: {mask}")
+                transformed = transformer.apply_mlx(self.layer_index, scores)
+                attention_bias = transformed - scores
+                if mask is not None and not isinstance(mask, str):
+                    attention_bias = attention_bias + mask
+                has_effect = getattr(transformer, "has_effect", lambda _: True)(
+                    self.layer_index
+                )
+                output = mx.fast.scaled_dot_product_attention(
+                    queries,
+                    keys,
+                    values,
+                    scale=self.base.scale,
+                    mask=attention_bias if has_effect else mask,
+                )
+                output = output.transpose(0, 2, 1, 3).reshape(batch, length, -1)
+                return self.base.o_proj(output)
+
+        for layer_index in sorted(selected_layers):
+            attention = layers[layer_index].self_attn
+            self._original_transform_attentions[layer_index] = attention
+            layers[layer_index].self_attn = TransformedAttention(attention, layer_index)
+
+    def unwrap_attention_transformer(self) -> None:
+        """Restore attention modules replaced by `wrap_attention_transformer`."""
+
+        if not self._original_transform_attentions:
+            return
+        if self.model is None or self._layers_path is None:
+            raise RuntimeError("Cannot restore transformed attention after model unload")
+        parent, attribute = self._layer_parent_and_attribute()
+        layers = list(getattr(parent, attribute))
+        for layer_index, attention in self._original_transform_attentions.items():
+            layers[layer_index].self_attn = attention
+        self._original_transform_attentions.clear()
 
     def make_cache(self) -> Any:
         if self.model is None:
