@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "closed_at": "2026-08-28T10:55:00+02:00",
+  "status": "DEGENERATIVE",
+  "source_commit": "6909080977638b1fdd5aa2a498604bd48a5c6c46",
+  "source_worktree_clean": true,
+  "primary_run": {
+    "run_id": "gemma4-e4b-coherent-residual-confirm-v2-475b9088d297",
+    "expected_generations": 3000,
+    "observed_generations": 3000,
+    "report_sha256": "fb830af35788c5dc1a0bf7dd64c956736f9237f3c023c7a31c04e4aa76008762",
+    "artifact_root": "98cfd333434008f69f2953b23f4af034c59c12d0fe6d8b075e7ea7eb0bd318ab",
+    "artifact_verified": true
+  },
+  "architecture_replication": {
+    "run_id": "qwen3-4b-architecture-replication-v3-configured-t0.01-50d427756c6b",
+    "expected_generations": 720,
+    "observed_generations": 720,
+    "report_sha256": "abe319f95cd8d71aa59a43d5aa493936d3a08c78b90a075a8db641bd41194124",
+    "artifact_root": "57afdf54a10e2e92d015f09fde8b05abe07376523fe293adc0b6907e0877b18a",
+    "artifact_verified": true
+  },
+  "combined_report": {
+    "path": "runs/combined-gemma4-e4b-qwen3-v1/combined.json",
+    "sha256": "40f9bc75ed201d88830f3ed81803e8436c9f35cafa9b5593272fce37839c7747"
+  },
+  "tracked_final_report": {
+    "path": "FINAL_REPORT.md",
+    "sha256": "d6f94555aae9ed351f3497e6d5be4aff000009032b5d83a36e28ce45ea8d68f1"
+  },
+  "data_hashes": {
+    "calibration": "a3f632a414e3bfe3244d3be2ebc7c6a254ea4695424f128576eec14c5aa1f803",
+    "pilot": "bb37ecc9b887bdc5c2da386c014c10323b0ede366c0aca8dae4b5636aa40b6f2",
+    "confirm": "2cfee5b7a29fb5e38d035715245dda975e0efead9566669763715244a7996059",
+    "controls": "d2609c6d9ab86598f0c941163af83d641b36cab9be0302a821fb82a42288c190"
+  },
+  "conclusions": {
+    "h1": "NOT_SUPPORTED",
+    "h2": "NOT_SUPPORTED",
+    "h3": "NOT_SUPPORTED",
+    "summary": "Coherent single-layer residual rotation did not improve valid semantic diversity over entropy-matched temperature and produced modest degeneration in both tested architectures."
+  },
+  "phase2_entry_gates": {
+    "v1_candidates_closed": true,
+    "v1_confirmation_complete": true,
+    "invalid_runs_machine_excluded": true,
+    "reports_and_checksums_complete": true,
+    "source_commit_recorded": true,
+    "phase2_prompts_not_used_for_v1": true,
+    "phase2_data_frozen": false
+  }
+}
