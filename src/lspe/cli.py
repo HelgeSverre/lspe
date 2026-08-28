@@ -20,6 +20,7 @@ from .human_review import export_human_review
 from .judge import judge_run, reparse_judge_run
 from .locking import create_experiment_lock, load_experiment_lock, write_experiment_lock
 from .models.factory import create_adapter
+from .networks.mapping_runner import MappingProtocol, run_functional_mapping
 from .pilot_selection import select_pilot_candidate, select_pilot_matrix
 from .preflight import (
     baseline_generation_sanity,
@@ -106,6 +107,27 @@ def build_data(
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from error
     _event(event="datasets_built", output=str(output), counts=counts)
+
+
+@app.command("map-networks")
+def map_networks(
+    config: ConfigOption,
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase2/network_map.jsonl"
+    ),
+    output: Annotated[Path, typer.Option("--output")] = Path("runs/fnde-network-map-qwen3"),
+    offline: Annotated[bool, typer.Option("--offline")] = True,
+) -> None:
+    """Run the frozen observation-only Qwen functional mapping stage."""
+
+    result = run_functional_mapping(
+        model_config=config,
+        data_path=data,
+        run_dir=output,
+        protocol=MappingProtocol(),
+        offline=offline,
+    )
+    _event(event="functional_mapping_complete", run=str(output), result=result["result"])
 
 
 @app.command()
