@@ -15,7 +15,7 @@ from ..columnar import write_parquet
 from ..config import load_config
 from ..fetch import fetch_model
 from ..generation.sampler import sample_token
-from ..hashing import sha256_file
+from ..hashing import sha256_bytes, sha256_file
 from ..models.mlx_qwen3 import MlxQwen3Adapter
 from ..rng import derive_seed
 from .communities import (
@@ -34,6 +34,7 @@ class MappingProtocol:
     """Frozen mapping-only choices, never selected using behavioral outcomes."""
 
     master_seed: int = 4_872_031
+    continuation_tokens: int = 1
     selected_layers: tuple[int, ...] = tuple(range(36))
     layer_batch_size: int = 6
     attention_bins: int = 16
@@ -110,8 +111,9 @@ def _fixed_continuations(
     path = run_dir / "fixed-continuations.jsonl"
     if path.exists():
         rows = [json.loads(line) for line in path.read_text().splitlines() if line]
-        if len(rows) != 2 * len(prompts):
+        if len(rows) != 2 * protocol.continuation_tokens * len(prompts):
             raise RuntimeError("Existing fixed continuation plan is incomplete")
+        _validate_continuation_plan(rows, prompts, protocol)
         return rows
     rows: list[dict[str, Any]] = []
     for index, prompt in enumerate(prompts, start=1):
@@ -121,35 +123,84 @@ def _fixed_continuations(
                 {"role": "user", "content": prompt.prompt},
             ]
         )
-        logits = adapter.forward(tokens).logits[0, -1]
-        greedy = int(np.argmax(logits))
-        sampled = sample_token(
-            logits,
-            temperature=0.8,
-            top_k=64,
-            top_p=1.0,
-            seed=derive_seed(protocol.master_seed, "sampling-token", prompt.prompt_id, 0),
-            store_top_logprobs=8,
-        ).token_id
-        for mode, token_id in (("greedy", greedy), ("sampled", sampled)):
-            rows.append(
-                {
-                    "row_index": len(rows),
-                    "prompt_id": prompt.prompt_id,
-                    "category": prompt.category,
-                    "pair_kind": prompt.pair_kind,
-                    "pair_id": prompt.pair_id,
-                    "pair_member": prompt.pair_member,
-                    "mode": mode,
-                    "prompt_token_ids": tokens,
-                    "continuation_token_id": token_id,
-                    "continuation_text": adapter.decode([token_id]),
-                }
-            )
+        for mode in ("greedy", "sampled"):
+            prefix: list[int] = []
+            for position in range(protocol.continuation_tokens):
+                logits = adapter.forward([*tokens, *prefix]).logits[0, -1]
+                if mode == "greedy":
+                    token_id = int(np.argmax(logits))
+                else:
+                    token_id = sample_token(
+                        logits,
+                        temperature=0.8,
+                        top_k=64,
+                        top_p=1.0,
+                        seed=derive_seed(
+                            protocol.master_seed,
+                            "sampling-token",
+                            prompt.prompt_id,
+                            position,
+                        ),
+                        store_top_logprobs=8,
+                    ).token_id
+                prefix.append(token_id)
+                rows.append(
+                    {
+                        "row_index": len(rows),
+                        "prompt_id": prompt.prompt_id,
+                        "category": prompt.category,
+                        "pair_kind": prompt.pair_kind,
+                        "pair_id": prompt.pair_id,
+                        "pair_member": prompt.pair_member,
+                        "prompt_sha256": sha256_bytes(prompt.prompt.encode("utf-8")),
+                        "mode": mode,
+                        "generated_position": position,
+                        "observation_token_ids": [*tokens, *prefix],
+                        "continuation_token_id": token_id,
+                        "continuation_text": adapter.decode([token_id]),
+                    }
+                )
         if index % 20 == 0:
-            print(json.dumps({"event": "mapping_continuations", "complete": index, "total": 200}))
+            print(
+                json.dumps(
+                    {
+                        "event": "mapping_continuations",
+                        "complete": index,
+                        "total": len(prompts),
+                    }
+                )
+            )
     path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
     return rows
+
+
+def _validate_continuation_plan(
+    rows: list[dict[str, Any]], prompts: list[Any], protocol: Any
+) -> None:
+    expected = {prompt.prompt_id: prompt for prompt in prompts}
+    counts = {prompt_id: 0 for prompt_id in expected}
+    combinations = {prompt_id: set() for prompt_id in expected}
+    for index, row in enumerate(rows):
+        prompt = expected.get(row.get("prompt_id"))
+        if prompt is None or row.get("row_index") != index:
+            raise RuntimeError("Existing fixed continuation plan has incompatible prompt rows")
+        counts[prompt.prompt_id] += 1
+        combinations[prompt.prompt_id].add((row.get("mode"), row.get("generated_position", 0)))
+        stored_hash = row.get("prompt_sha256")
+        if stored_hash is not None and stored_hash != sha256_bytes(prompt.prompt.encode("utf-8")):
+            raise RuntimeError("Existing fixed continuation plan has changed prompt content")
+        if protocol.continuation_tokens > 1 and stored_hash is None:
+            raise RuntimeError("V2 continuation plans require prompt content hashes")
+    required = 2 * protocol.continuation_tokens
+    if any(count != required for count in counts.values()):
+        raise RuntimeError("Existing fixed continuation plan has incompatible prompt counts")
+    expected_combinations = {
+        (mode, position)
+        for mode in ("greedy", "sampled")
+        for position in range(protocol.continuation_tokens)
+    }
+    if any(values != expected_combinations for values in combinations.values()):
+        raise RuntimeError("Existing fixed continuation plan has incompatible positions")
 
 
 def _collect_activity(
@@ -166,6 +217,8 @@ def _collect_activity(
     row_count = len(continuations)
     raw_path = run_dir / "component-activity.npy"
     pattern_path = run_dir / "attention-patterns.npy"
+    raw_existed = raw_path.exists()
+    patterns_existed = pattern_path.exists()
     raw = _memmap(raw_path, (node_count, row_count, hidden_width), preserve=True)
     patterns = _memmap(
         pattern_path, (node_count, row_count, protocol.attention_bins), preserve=True
@@ -173,6 +226,8 @@ def _collect_activity(
     checkpoint_path = run_dir / "mapping-checkpoint.json"
     completed = set()
     if checkpoint_path.exists():
+        if not raw_existed or not patterns_existed:
+            raise RuntimeError("Mapping checkpoint exists without its component arrays")
         completed = set(json.loads(checkpoint_path.read_text())["completed_layers"])
     layers = list(protocol.selected_layers)
     for offset in range(0, len(layers), protocol.layer_batch_size):
@@ -186,7 +241,10 @@ def _collect_activity(
         adapter.wrap_attention_observer(observer, frozenset(pending))
         try:
             for index, row in enumerate(continuations, start=1):
-                adapter.forward([*row["prompt_token_ids"], row["continuation_token_id"]])
+                token_ids = row.get("observation_token_ids")
+                if token_ids is None:
+                    token_ids = [*row["prompt_token_ids"], row["continuation_token_id"]]
+                adapter.forward(token_ids)
                 if index % 40 == 0:
                     print(
                         json.dumps(
@@ -465,7 +523,8 @@ def _pair_similarity(activity: np.ndarray, prompts: list[Any]) -> dict[str, floa
             by_pair.setdefault((prompt.pair_kind, prompt.pair_id), []).append(prompt_index)
     scores: dict[str, list[float]] = {"paraphrase": [], "unrelated": []}
     # Each prompt owns adjacent greedy and sampled rows; average both modes and all heads.
-    summarized = np.mean(activity, axis=0).reshape(len(prompts), 2, -1).mean(axis=1)
+    summarized = np.mean(activity, axis=0).reshape(len(prompts), -1, activity.shape[-1])
+    summarized = summarized.mean(axis=1)
     summarized /= np.maximum(np.linalg.norm(summarized, axis=1, keepdims=True), 1e-12)
     for (kind, _), members in by_pair.items():
         if len(members) == 2:
@@ -583,7 +642,10 @@ def _attention_js(first: np.ndarray, second: np.ndarray) -> float:
 
 def _memmap(path: Path, shape: tuple[int, ...], preserve: bool = False) -> np.memmap:
     if preserve and path.exists():
-        return np.load(path, mmap_mode="r+")
+        existing = np.load(path, mmap_mode="r+")
+        if existing.shape != shape or existing.dtype != np.float32:
+            raise RuntimeError(f"Existing array is incompatible with resumed run: {path}")
+        return existing
     return np.lib.format.open_memmap(path, mode="w+", dtype=np.float32, shape=shape)
 
 

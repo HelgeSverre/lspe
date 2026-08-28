@@ -20,6 +20,7 @@ from .human_review import export_human_review
 from .judge import judge_run, reparse_judge_run
 from .locking import create_experiment_lock, load_experiment_lock, write_experiment_lock
 from .models.factory import create_adapter
+from .networks.consensus_runner import run_consensus_mapping
 from .networks.mapping_closeout import close_out_mapping_failure, verify_mapping_checksums
 from .networks.mapping_runner import MappingProtocol, run_functional_mapping
 from .networks.mapping_sensitivity import run_nested_mapping_sensitivity
@@ -130,6 +131,25 @@ def map_networks(
         offline=offline,
     )
     _event(event="functional_mapping_complete", run=str(output), result=result["result"])
+
+
+@app.command("map-networks-v2")
+def map_networks_v2(
+    config: ConfigOption,
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase2/network_map_v2.jsonl"
+    ),
+    output: Annotated[Path, typer.Option("--output")] = Path(
+        "runs/fnde-v2-consensus-map-qwen3"
+    ),
+    offline: Annotated[bool, typer.Option("--offline")] = True,
+) -> None:
+    """Run the stronger task-balanced FNDE v2 map."""
+
+    result = run_consensus_mapping(
+        model_config=config, data_path=data, run_dir=output, offline=offline
+    )
+    _event(event="consensus_mapping_complete", run=str(output), result=result["result"])
 
 
 @app.command("map-sensitivity")
