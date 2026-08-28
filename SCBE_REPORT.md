@@ -113,3 +113,19 @@ invariants, frozen calibration, provenance, and verified SHA-256 checksums.
 See [SCCF_BEHAVIORAL_SPEC.md](SCCF_BEHAVIORAL_SPEC.md),
 [SCBE_CONTROL_MATCH_AMENDMENT.md](SCBE_CONTROL_MATCH_AMENDMENT.md), and
 [SCBE_NOISE_INTERPOLATION_AMENDMENT.md](SCBE_NOISE_INTERPOLATION_AMENDMENT.md).
+
+The exact verification/resume command is:
+
+```bash
+uv run lspe run-connectivity-behavior \
+  --config configs/fallback.qwen3-4b.yaml \
+  --map-run runs/dcf-map-qwen3-6bdfd20 \
+  --sccf-run runs/sccf-qwen3-5332e36 \
+  --data-root data/phase4 \
+  --output runs/scbe-v3-qwen3-f0694f3 \
+  --offline
+```
+
+It validates the source/data/parent run lock, reuses all 432 content-addressed
+generation identities, rebuilds the terminal summaries, and fails if any frozen
+input differs.
