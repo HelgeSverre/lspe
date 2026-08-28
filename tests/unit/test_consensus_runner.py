@@ -105,3 +105,21 @@ def test_final_fit_prunes_isolates_from_tuning_eligible_graph() -> None:
         ]
     )
     assert np.array_equal(_stable_nonisolated_nodes([graph]), [0, 1])
+
+
+def test_heldout_intersection_keeps_common_nonisolated_nodes() -> None:
+    first = np.array(
+        [
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ]
+    )
+    second = np.array(
+        [
+            [0.0, 0.5, 0.0],
+            [0.5, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ]
+    )
+    assert np.array_equal(_stable_nonisolated_nodes([first, second]), [0, 1])

@@ -62,6 +62,8 @@ class ConsensusMappingProtocol:
     null_samples: int = 100
     minimum_split_half_ari: float = 0.70
     minimum_assignment_probability: float = 0.80
+    minimum_heldout_coverage: float = 0.80
+    minimum_community_fraction: float = 0.05
     system_prompt: str = "Follow the requested format exactly. Give only the answer."
 
 
@@ -163,12 +165,16 @@ def _build_consensus_map(
                 for graph in (tuning_graphs[1], tuning_graphs[3])
             ]
             heldout_graphs = (tuning_graphs[2], tuning_graphs[4])
-            if any(np.any(np.sum(graph, axis=1) == 0) for graph in heldout_graphs):
+            heldout_positions = _stable_nonisolated_nodes(list(heldout_graphs))
+            heldout_coverage = len(heldout_positions) / len(tuning_eligible)
+            if len(heldout_positions) <= count:
                 heldout_ari = -1.0
             else:
                 heldout_labels = [
                     spectral_communities(
-                        graph, count, seed=protocol.master_seed + count
+                        graph[np.ix_(heldout_positions, heldout_positions)],
+                        count,
+                        seed=protocol.master_seed + count,
                     )
                     for graph in heldout_graphs
                 ]
@@ -180,6 +186,7 @@ def _build_consensus_map(
                     "eligible_nodes": len(tuning_eligible),
                     "tuning_ari": adjusted_rand_index(*tuning_labels),
                     "heldout_ari": heldout_ari,
+                    "heldout_coverage": heldout_coverage,
                 }
             )
             candidate_state[(density, count)] = (tuning_eligible, tuning_graphs[0])
@@ -218,11 +225,15 @@ def _build_consensus_map(
     mixed_layers = sum(
         len(set(labels[layer_labels == layer])) > 1 for layer in protocol.selected_layers
     )
+    _, community_sizes = np.unique(labels, return_counts=True)
+    minimum_community_fraction = float(np.min(community_sizes) / len(labels))
     pair_stability = _pair_similarity(raw, prompts)
     modularity = weighted_modularity(community_graph, labels)
     null_95 = float(np.quantile(nulls, 0.95))
     gates = {
         "heldout_ari": selected["heldout_ari"] >= protocol.minimum_split_half_ari,
+        "heldout_coverage": selected["heldout_coverage"]
+        >= protocol.minimum_heldout_coverage,
         "assignment_probability": float(np.median(assignment))
         >= protocol.minimum_assignment_probability,
         "paraphrase_over_unrelated": pair_stability["paraphrase"]
@@ -230,6 +241,8 @@ def _build_consensus_map(
         "not_layer_only": adjusted_rand_index(labels, layer_labels) < 0.90,
         "not_shared_kv_only": adjusted_rand_index(labels, kv_labels) < 0.90,
         "minimum_communities": selected["community_count"] >= 3,
+        "community_balance": minimum_community_fraction
+        >= protocol.minimum_community_fraction,
         "mixed_layers": mixed_layers >= 2,
         "null_modularity": modularity > null_95,
     }
@@ -260,6 +273,8 @@ def _build_consensus_map(
         "layer_ari": adjusted_rand_index(labels, layer_labels),
         "shared_kv_ari": adjusted_rand_index(labels, kv_labels),
         "mixed_layer_count": mixed_layers,
+        "community_sizes": [int(value) for value in community_sizes],
+        "minimum_community_fraction": minimum_community_fraction,
         "labels": {
             _node_id(protocol, geometry["attention_heads"], int(node)): int(label)
             for node, label in zip(eligible, labels, strict=True)
