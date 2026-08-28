@@ -147,6 +147,28 @@ version that demonstrably created the intended desynchronized internal regime;
 the remaining problem is making that regime selective enough not to cross the
 damage line as soon as it meaningfully affects output.
 
+### The selective attempt
+
+SCCF stopped flattening every connectivity mode and causally screened all 256
+eigenmodes in the stable eight-layer window. For once, the stricter experiment
+found a real opening.
+
+A frozen 16-mode intervention passed the active-dose and competence gates, then
+repeated on untouched prompts: attention correlation fell 46.9%, effective rank
+rose 174.5%, output KL reached 0.0151, and top-1 agreement remained 81.25%.
+The dominant correlation mode in every selected layer occupied the top eight
+places in the causal ranking.
+
+This is a **mechanism pass**, not yet a creativity result. The category split is
+the interesting complication: factual, code, and analogy predictions stayed
+near baseline, while open association, narrative, and constrained formatting
+moved substantially. The next behavioral protocol therefore needs per-category
+competence gates and randomness/temperature controls before generated text can
+support a stronger claim.
+
+See [SCCF_REPORT.md](SCCF_REPORT.md) and
+[SELECTIVE_CAUSAL_CONNECTIVITY_SPEC.md](SELECTIVE_CAUSAL_CONNECTIVITY_SPEC.md).
+
 ## Setup
 
 ```bash

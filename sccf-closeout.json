@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "status": "MECHANISM_PASS",
+  "stage_reached": "selective_connectivity_heldout_confirmation",
+  "source_commit": "5332e36",
+  "model_revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+  "data_sha256": "08578e84e8d67f4b9f23bc900c6fb8748df61e2489e1870313fc8e5530b88459",
+  "run": "runs/sccf-qwen3-5332e36",
+  "screened_modes": 256,
+  "ranked_selective_modes": 255,
+  "calibration_candidates": 20,
+  "eligible_calibration_candidates": 1,
+  "selected_mask_size": 16,
+  "selected_alpha": 0.5,
+  "tuning": {
+    "median_correlation_change": -0.46994720390299766,
+    "median_effective_rank_change": 1.7472360125894164,
+    "median_output_kl": 0.00824098974616238,
+    "overall_top1_agreement": 0.8055555555555557,
+    "protection_top1_agreement": 0.84375
+  },
+  "heldout": {
+    "passed": true,
+    "median_correlation_change": -0.46864625871278787,
+    "correlation_change_95": [-0.47581788682993786, -0.4589098589030559],
+    "median_effective_rank_change": 1.7454788686804676,
+    "effective_rank_change_95": [1.7140962082444795, 1.776130511985561],
+    "median_output_kl": 0.01505195950037315,
+    "overall_top1_agreement": 0.8125,
+    "protection_top1_agreement": 0.84375,
+    "target_top1_agreement": 0.8229166666666667,
+    "target_median_output_kl": 0.007997912729995364,
+    "protection_median_output_kl": 0.0000013758610866418162
+  },
+  "category_caveat": "Pooled protection passed, but constrained-formatting top-1 was 0.7292 and narrative top-1 was 0.6979; behavioral follow-up requires per-category gates.",
+  "behavioral_stages_executed": false,
+  "artifact_checksums_verified": true
+}
