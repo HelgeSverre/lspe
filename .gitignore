@@ -37,8 +37,8 @@ runs/*
 !runs/.gitkeep
 
 # Local model caches, downloads, and credentials
-models/
-checkpoints/
+/models/
+/checkpoints/
 .cache/
 .env
 .env.*
