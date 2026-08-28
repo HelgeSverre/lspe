@@ -1,4 +1,4 @@
-# I Tried to Desegregate an LLM's Brain
+# I Tried Harder to Desegregate an LLM's Brain
 
 **Functional Network Desegregation Experiment (FNDE), Phase 2**
 
@@ -11,10 +11,43 @@ model's functional networks, then temporarily blur the boundaries between them?
 That would be a much closer computational analogy to the idea that psilocybin
 changes communication among brain networks.
 
-The answer, this time, arrived before the drug was administered: **the network
-map was not stable enough to intervene on honestly.**
+The answer arrived before the drug was administered: **even after a much larger,
+stricter second mapping attempt, the network map was not stable or balanced
+enough to intervene on honestly.**
 
-## What ran
+## The stronger second attempt
+
+The first mapping result left open a fair objection: perhaps 200 prompts and
+one greedy plus one sampled position per prompt were simply too weak. FNDE v2
+therefore started over with a frozen amendment and fresh data:
+
+- 240 new prompts, 40 in each of six task families;
+- 60 paraphrase pairs and 30 unrelated-prompt controls;
+- two greedy and two sampled generated positions per prompt;
+- 960 observations across all 1,152 attention heads;
+- one graph per task family, combined with equal weight;
+- four folds, with folds 0/2 selecting the graph and folds 1/3 untouched;
+- 11 graph densities and three through eight communities tested without using
+  held-out outcomes to choose among them.
+
+The run produced roughly 22 GB of telemetry. Its selected candidate used 7.5%
+graph density and three communities.
+
+| V2 measure | Result | Gate |
+| --- | ---: | ---: |
+| Tuning-fold ARI | 0.808 | selection only |
+| Held-out evaluable-head coverage | 94.3% | at least 80% |
+| Held-out ARI | **0.548** | **at least 0.700** |
+| Final community sizes | **803 / 18 / 10** | each at least 5% |
+| Smallest community | **1.2%** | **at least 5%** |
+
+This is a clearer failure than v1. The tuning score proves the machinery can
+find an apparently repeatable partition. The untouched prompts show that the
+chosen partition does not generalize, while the 803/18/10 split shows that it
+is mostly one giant cluster with two tiny leftovers—not three plausible
+functional systems.
+
+## The first attempt
 
 The subject was the pinned 4-bit Qwen3 4B model used for the v1 architecture
 replication. The mapping stage covered all 36 decoder layers and all 1,152
@@ -35,7 +68,7 @@ The 440 prompts across all Phase 2 splits were hashed before telemetry, with no
 normalized cross-split duplicates and a maximum character similarity of 0.800
 against the 0.920 leakage stop threshold.
 
-## Primary map
+## V1 primary map
 
 At the frozen 2% graph density:
 
@@ -57,7 +90,7 @@ Seven of eight mapping gates passed. The one that failed was the one that makes
 the network boundaries meaningful: independent prompt halves did not recover
 the same communities.
 
-## The anti-cherry-picking check
+## V1 anti-cherry-picking check
 
 A mapping-only sensitivity sweep tested graph densities from 0.5% through 20%
 and community counts from three through eight. This produced some tempting
@@ -79,7 +112,7 @@ afterward.
 
 ## Decision
 
-The registered decision is `STOP_MAPPING_UNSTABLE`, yielding the experiment
+Both registered attempts end at `STOP_MAPPING_UNSTABLE`, yielding the experiment
 status `MECHANISM_NOT_ACHIEVED`.
 
 The result does not say Qwen has no functional structure. The graph was
@@ -102,14 +135,19 @@ networks. The stop is the result.
 
 ## Integrity
 
-The local run is `runs/fnde-network-map-qwen3-61e90a4`. Its exact mapping data,
+The v1 local run is `runs/fnde-network-map-qwen3-61e90a4`. Its exact mapping data,
 400 continuation rows, component and attention array shapes, finite telemetry,
 primary failure, nested held-out failure, stop decision, and file checksums all
 pass verification. Large telemetry remains local and ignored by Git; the
 machine-readable closeout and this report are tracked.
 
+The stronger run is `runs/fnde-v2-consensus-map-qwen3-d8e2e6b`. Its fresh-data
+hash, 960-row collection, array shapes, finite telemetry, tuning-only selection,
+corrected held-out evaluation, stop decision, and artifact checksums all pass
+verification. Its machine-readable closeout is `fnde-v2-closeout.json`.
+
 The original protocol remains in
 [NETWORK_DESEGREGATION_SPEC.md](NETWORK_DESEGREGATION_SPEC.md). A future attempt
-should be a new preregistered study—likely with longer continuations, a larger
-mapping corpus, repeated contexts, and stability-aware graph estimation—not a
-post-hoc relaxation of this run's 0.700 gate.
+should change the representation itself—likely modelling information exchange
+between components over longer trajectories—not merely add prompts or relax the
+0.700 gate after the fact.

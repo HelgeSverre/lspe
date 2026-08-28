@@ -104,19 +104,25 @@ reproducible answer—even when the answer is "no."
 
 ## The network experiment
 
-The more ambitious follow-up has now run. It tried to map something closer to
-functional networks across all 1,152 attention heads in Qwen3 4B before
-temporarily increasing communication across their boundaries.
+The more ambitious follow-up tried to map something closer to functional
+networks across all 1,152 attention heads in Qwen3 4B before temporarily
+increasing communication across their boundaries.
 
-It stopped at the first major gate. The graph looked non-random and recovered
-seven apparent communities, but the partition was not stable across prompt
-splits: ARI `0.350` against a required `0.700`. A nested density audit improved
-the tuning score to `0.858`, then scored only `0.660` on untouched mapping
-folds. So the model never received the network-level intervention.
+The first map failed its stability gate. We then tried substantially harder:
+240 entirely fresh prompts across six task families, four generated positions
+per prompt, task-balanced graphs, every attention head, and a preregistered
+tuning/held-out split. That produced 960 observations and 22 GB of telemetry.
+
+The selected map looked convincing on its tuning folds (ARI `0.808`) but fell
+to `0.548` on untouched folds, below the unchanged `0.700` requirement. Its
+three apparent communities contained 803, 18, and 10 heads—one continent and
+two crumbs, not a credible set of functional networks. So the model still did
+not receive the network-level intervention.
 
 See [FNDE_REPORT.md](FNDE_REPORT.md) for the full result and
 [NETWORK_DESEGREGATION_SPEC.md](NETWORK_DESEGREGATION_SPEC.md) for the protocol.
-This is a useful failure: it prevents a fragile clustering from being dressed
+This is a useful failure: throwing more data and stricter analysis at the idea
+made the answer clearer, and prevented a fragile clustering from being dressed
 up as evidence that the model's “brain networks” were desegregated.
 
 ## Setup
