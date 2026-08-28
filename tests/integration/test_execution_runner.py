@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pytest
 
 from lspe.config import load_config
 from lspe.execution import ExperimentRunner
@@ -73,3 +74,23 @@ def test_runner_creates_complete_append_only_paired_matrix(
     assert (summary.run_dir / "prompt-renders.jsonl").is_file()
     assert (summary.run_dir / "environment.txt").is_file()
     assert (summary.run_dir / "packages.lock.json").is_file()
+
+
+def test_runner_refuses_resume_into_incompatible_manifest(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    config = load_config("configs/smoke.gemma4-e4b.yaml")
+    config = config.model_copy(
+        update={
+            "experiment": config.experiment.model_copy(update={"output_root": tmp_path}),
+            "sampling": config.sampling.model_copy(update={"max_new_tokens": 1}),
+        }
+    )
+    monkeypatch.setattr("lspe.execution.create_adapter", lambda _: FakeAdapter())
+    ExperimentRunner(config, Path("configs/smoke.gemma4-e4b.yaml"), "commit123", [0], 0.1).run()
+
+    incompatible = ExperimentRunner(
+        config, Path("configs/smoke.gemma4-e4b.yaml"), "commit123", [0], 0.2
+    )
+    with pytest.raises(RuntimeError, match="Existing run manifest is incompatible"):
+        incompatible.run(resume=True)

@@ -17,7 +17,7 @@ from .doctor import inspect_environment, report_dict
 from .execution import ExperimentRunner
 from .fetch import fetch_model
 from .human_review import export_human_review
-from .judge import judge_run
+from .judge import judge_run, reparse_judge_run
 from .locking import create_experiment_lock, load_experiment_lock, write_experiment_lock
 from .models.factory import create_adapter
 from .pilot_selection import select_pilot_candidate, select_pilot_matrix
@@ -31,6 +31,7 @@ from .preflight import (
     zero_dose_suite,
 )
 from .reporting import build_report
+from .reporting.combined import build_combined_report
 from .scoring import score_run
 from .tasks.default_data import build_default_datasets
 from .tasks.loader import load_prompts
@@ -445,6 +446,7 @@ def pilot(
 def freeze(
     config: ConfigOption,
     pilot_run: Annotated[Path, typer.Option("--pilot-run", exists=True, file_okay=False)],
+    output: Annotated[Path, typer.Option("--output")] = Path("experiment.lock.yaml"),
 ) -> None:
     """Freeze a selected pilot candidate into an immutable experiment lock."""
 
@@ -508,12 +510,11 @@ def freeze(
                 )
             ),
         )
-        path = Path("experiment.lock.yaml")
-        write_experiment_lock(lock, path)
+        write_experiment_lock(lock, output)
     except Exception as error:
         _event(event="freeze_failed", error_type=type(error).__name__, error=str(error))
         raise typer.Exit(code=1) from error
-    _event(event="freeze_complete", lock=str(path), experiment_id=lock.experiment_id)
+    _event(event="freeze_complete", lock=str(output), experiment_id=lock.experiment_id)
 
 
 @app.command("select-pilot")
@@ -787,6 +788,13 @@ def analyze(run: RunOption) -> None:
 def judge(
     run: RunOption,
     offline: Annotated[bool, typer.Option("--offline")] = False,
+    reparse: Annotated[
+        bool,
+        typer.Option(
+            "--reparse",
+            help="Reparse existing blinded judge responses without regeneration.",
+        ),
+    ] = False,
 ) -> None:
     """Run blinded Qwen pairwise secondary judging after subject-model execution."""
 
@@ -795,13 +803,20 @@ def judge(
         _event(event="judge_skipped", reason="JUDGE_DISABLED")
         return
     try:
-        summary = judge_run(
-            run, config.scoring.local_judge_model, config.experiment.master_seed, offline
+        summary = (
+            reparse_judge_run(run, config.scoring.local_judge_model, offline)
+            if reparse
+            else judge_run(
+                run,
+                config.scoring.local_judge_model,
+                config.experiment.master_seed,
+                offline,
+            )
         )
     except Exception as error:
         _event(event="judge_failed", error_type=type(error).__name__, error=str(error))
         raise typer.Exit(code=1) from error
-    _event(event="judge_complete", **summary.__dict__)
+    _event(event="judge_complete", reparse=reparse, **summary.__dict__)
 
 
 @app.command()
@@ -858,6 +873,41 @@ def report(run: RunOption) -> None:
         run_id=manifest["run_id"],
         status=analysis["status"],
         root_digest=root,
+    )
+
+
+@app.command("combine")
+def combine_reports(
+    primary_run: Annotated[Path, typer.Option("--primary-run", exists=True, file_okay=False)],
+    replication_run: Annotated[
+        Path, typer.Option("--replication-run", exists=True, file_okay=False)
+    ],
+    output: Annotated[Path, typer.Option("--output")] = Path("runs/combined-report"),
+) -> None:
+    """Build a non-pooled, cross-model final report from verified run reports."""
+
+    for source in (primary_run, replication_run):
+        verification = verify_scientific_artifacts(source)
+        if not verification.passed:
+            raise typer.BadParameter(
+                "Source run is not scientifically verified: "
+                f"{source}: {'; '.join(verification.reasons)}"
+            )
+    if output.exists() and (not output.is_dir() or any(output.iterdir())):
+        raise typer.BadParameter(
+            f"Refusing to overwrite non-empty combined-report directory: {output}"
+        )
+    try:
+        combined = build_combined_report(output, primary_run, replication_run)
+    except Exception as error:
+        _event(event="combine_failed", error_type=type(error).__name__, error=str(error))
+        raise typer.Exit(code=1) from error
+    _event(
+        event="combine_complete",
+        output=str(output),
+        status=combined["conclusion"]["status"],
+        primary_run=combined["primary"]["run_id"],
+        replication_run=combined["architecture_replication"]["run_id"],
     )
 
 

@@ -139,7 +139,9 @@ def verify_replay(run_dir: Path, sample: int) -> ArtifactVerification:
         return projection
     raw_by_id = {str(row["generation_id"]): row for row in raw_rows}
     selected = _stratified_replay_sample(plan, sample, config.experiment.master_seed)
-    reasons = _verify_stored_sham_pairs(raw_by_id, selected)
+    reasons = _verify_stored_sham_pairs(
+        raw_by_id, selected, require_sham="sham" in config.conditions
+    )
     adapter = create_adapter(config.model)
     runner = ExperimentRunner(
         config,
@@ -294,8 +296,15 @@ def _stratified_replay_sample(
 
 
 def _verify_stored_sham_pairs(
-    raw_by_id: dict[str, dict[str, Any]], selected: list[dict[str, Any]]
+    raw_by_id: dict[str, dict[str, Any]],
+    selected: list[dict[str, Any]],
+    *,
+    require_sham: bool = True,
 ) -> list[str]:
+    """Check stored sham identity only for protocols that actually include sham."""
+
+    if not require_sham:
+        return []
     by_pair: dict[tuple[str, int], dict[str, dict[str, Any]]] = {}
     for row in raw_by_id.values():
         key = (str(row["prompt_id"]), int(row["generation_index"]))

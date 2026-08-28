@@ -106,6 +106,41 @@ def judge_run(
     return JudgeSummary(len(records), parsed, len(records) - parsed, fetched.revision)
 
 
+def reparse_judge_run(
+    run_dir: Path, judge_model: str, offline: bool = False
+) -> JudgeSummary:
+    """Reparse already-generated blinded responses after a parser-only repair.
+
+    This recovery path deliberately never calls the judge model.  It preserves
+    the response text, labels, pair order, and unblinding key from the original
+    run, changing only the deterministic ``ratings`` and ``parse_failure``
+    fields derived from that text.
+    """
+
+    records = _read_jsonl(run_dir / "judge.jsonl")
+    repaired = _reparse_records(records)
+    model = ModelConfig(adapter="mlx_qwen3", repo_id=judge_model)
+    fetched = fetch_model(model, offline=offline)
+    (run_dir / "judge.jsonl").write_text(
+        "".join(json.dumps(record, sort_keys=True) + "\n" for record in repaired), encoding="utf-8"
+    )
+    parsed = sum(record["ratings"] is not None for record in repaired)
+    return JudgeSummary(len(repaired), parsed, len(repaired) - parsed, fetched.revision)
+
+
+def _reparse_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return copies whose parse fields are regenerated from immutable text."""
+
+    repaired: list[dict[str, Any]] = []
+    for record in records:
+        updated = dict(record)
+        assessment, error = _parse_assessment(str(updated.get("response", "")))
+        updated["ratings"] = assessment
+        updated["parse_failure"] = error
+        repaired.append(updated)
+    return repaired
+
+
 def _pairs(
     generations: list[dict[str, Any]], master_seed: int
 ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
@@ -154,8 +189,16 @@ def _greedy_judge_response(adapter: Any, prompt: str, first: str, second: str) -
 
 
 def _parse_assessment(text: str) -> tuple[dict[str, dict[str, int]] | None, str | None]:
+    # Qwen chat templates can decode their assistant terminator even when the
+    # token is also configured as EOS.  It is transport framing, not part of
+    # the requested JSON payload.  Strip only recognised *trailing* markers;
+    # arbitrary prose or malformed JSON must still fail closed below.
+    normalized = text.strip()
+    for terminator in ("<|im_end|>", "<|endoftext|>"):
+        if normalized.endswith(terminator):
+            normalized = normalized[: -len(terminator)].rstrip()
     try:
-        payload = json.loads(text)
+        payload = json.loads(normalized)
     except json.JSONDecodeError:
         return None, "INVALID_JSON"
     if not isinstance(payload, dict) or set(payload) != {"A", "B"}:

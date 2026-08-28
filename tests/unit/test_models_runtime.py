@@ -6,6 +6,15 @@ import pytest
 from lspe.models.runtime import RuntimeUnavailableError, import_module
 
 
+def test_gemma_post_layer_position_uses_shared_kv_offset() -> None:
+    from lspe.models.mlx_gemma4 import _post_layer_token_index
+
+    assert _post_layer_token_index(SimpleNamespace(offset=17), None, 1) == 16
+    # KV-sharing layers have no independent cache, but their returned offset
+    # still identifies the generated token's absolute position.
+    assert _post_layer_token_index(None, 17, 1) == 16
+
+
 def test_missing_runtime_has_actionable_diagnostic() -> None:
     with pytest.raises(RuntimeUnavailableError, match="preflight"):
         import_module("lspe_missing_runtime_for_test", "mlx-lm")

@@ -56,28 +56,34 @@ not arbitrary vector magnitude. The main question is whether coherent internal
 perturbation increases **valid semantic diversity** beyond ordinary sampling
 randomness while preserving more competence than incoherent activation noise.
 
-## Results so far
+## Final results
 
-The current Gemma 4 pilot is a useful negative result. At the tested
-lower-middle layer, coherent perturbation did **not** outperform entropy-matched
-temperature sampling:
+The experiment is closed with a **degenerative, non-supporting result**. A
+locked Gemma confirmation run and an independently calibrated Qwen architecture
+replication both found no reliable increase in valid semantic diversity over
+entropy-matched temperature sampling.
 
-| Target KL | Coherent − temperature valid semantic diversity | Outcome |
-| ---: | ---: | --- |
-| 0.01 | -0.0189 | Not supported |
-| 0.03 | -0.0326 | Not supported |
-| 0.10 | -0.0431 | Degenerative |
-| 0.30 | -0.0431 | Degenerative |
+| Run | Model | Prompts | Coherent − temperature valid semantic diversity (95% CI) | p-value | Result |
+| --- | --- | ---: | --- | ---: | --- |
+| Primary confirmation | Gemma 4 E4B | 120 | -0.00384 (-0.01201, 0.00413) | 0.350 | Not supported |
+| Architecture replication | Qwen3 4B | 60 | 0.00017 (-0.01156, 0.01142) | 0.975 | Not supported |
 
-Low doses mostly did little or slightly reduced useful diversity. Stronger
-doses increasingly damaged format validity and produced degeneration. The model
-did react—but more like a system under structured interference than one granted
-a burst of productive association.
+The Gemma effect is slightly negative and its confidence interval crosses zero.
+The Qwen estimate is effectively zero. Because the primary effect is
+non-positive and the models use independently calibrated doses, the results are
+not pooled and do not establish a positive-direction replication.
 
-These are **pilot observations, not confirmatory findings**. Candidate selection,
-a frozen confirmation run, and precision or architecture replication remain to
-be completed. Null, negative, and degenerative outcomes use the same reporting
-and verification path as positive ones.
+Coherent perturbation also did not show a reliable competence advantage over
+white (per-token random) activation noise. In the Qwen run it reduced
+deterministic validity by 3.9 percentage points relative to white noise; the
+Holm-adjusted secondary test was not significant. The overall pattern is more
+consistent with structured interference than with a productive, general-purpose
+increase in associative exploration.
+
+See [FINAL_REPORT.md](FINAL_REPORT.md) for methods, exact outcomes, integrity
+checks, limitations, and reproduction commands. The source reports and raw
+append-only generation records remain in the local `runs/` directory; they are
+intentionally not committed to Git.
 
 ## Why this is more than a weird-output generator
 
@@ -104,8 +110,9 @@ model's normal functional boundaries and increasing communication between
 normally separated groups of attention heads.
 
 That protocol is specified in [NETWORK_DESEGREGATION_SPEC.md](NETWORK_DESEGREGATION_SPEC.md).
-It cannot begin until this experiment is formally closed, and it treats later
-fine-tuning as integration after the altered state—not as the drug itself.
+The present experiment is formally closed. Any follow-up should be treated as a
+new, separately preregistered study rather than a reinterpretation of this
+negative result.
 
 ## Setup
 

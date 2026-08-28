@@ -60,6 +60,16 @@ def _tagged_for_phase(prompts: list[PromptRecord], phase: str) -> list[PromptRec
     return [prompt for prompt in prompts if phase in prompt.tags]
 
 
+def _load_prompt_snapshot(path: Path) -> list[PromptRecord]:
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    return [
+        PromptRecord.model_validate(json.loads(line))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+
+
 class ExperimentRunner:
     """Executes all paired conditions without reseeding failures or mutating weights."""
 
@@ -93,6 +103,8 @@ class ExperimentRunner:
             raise FileExistsError(
                 f"Run already exists: {run_dir}; use --resume to reuse complete rows"
             )
+        else:
+            self._validate_resume_artifacts(run_dir, run_id, prompts)
         plan = build_generation_plan(
             self.config,
             prompts,
@@ -288,6 +300,49 @@ class ExperimentRunner:
         (run_dir / "model-files.json").write_text(
             json.dumps(model_files, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
+
+    def _validate_resume_artifacts(
+        self, run_dir: Path, run_id: str, prompts: list[PromptRecord]
+    ) -> None:
+        """Refuse resume unless the immutable scientific inputs are identical.
+
+        Run IDs are intentionally human-readable and therefore can collide
+        across an earlier attempt with changed calibration or a new lock.  A
+        content-ID check alone is not sufficient: it would permit mixing two
+        scientific matrices under one manifest and stale prompt snapshot.
+        """
+
+        path = run_dir / "manifest.json"
+        try:
+            actual = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise RuntimeError(f"Cannot validate existing run manifest: {path}") from error
+        expected = self._manifest(run_id, prompts)
+        fields = (
+            "run_id",
+            "config_hash",
+            "model_repo",
+            "model_revision",
+            "prompt_count",
+            "selected_layers",
+            "raw_dose",
+            "white_raw_dose",
+            "matched_temperature",
+        )
+        mismatched = [field for field in fields if actual.get(field) != expected[field]]
+        if mismatched:
+            raise RuntimeError(
+                "Existing run manifest is incompatible with --resume: "
+                + ", ".join(mismatched)
+            )
+        try:
+            snapshot = _load_prompt_snapshot(run_dir / "prompts.snapshot.jsonl")
+        except (OSError, json.JSONDecodeError, ValueError) as error:
+            raise RuntimeError("Cannot validate existing prompt snapshot") from error
+        expected_by_id = {prompt.prompt_id: prompt for prompt in prompts}
+        snapshot_by_id = {prompt.prompt_id: prompt for prompt in snapshot}
+        if snapshot_by_id != expected_by_id:
+            raise RuntimeError("Existing prompt snapshot is incompatible with --resume")
 
     def _write_prompt_renders(
         self, adapter: Any, prompts: list[PromptRecord], run_dir: Path

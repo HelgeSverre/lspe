@@ -1,7 +1,9 @@
 schema_version: 1
 experiment:
-  name: qwen3-4b-fallback
-  phase: replicate
+  # New artifact namespace after an incompatible historical --resume collision.
+  # All experimental parameters below remain those frozen for confirmation.
+  name: gemma4-e4b-coherent-residual-confirm-v2
+  phase: confirm
   master_seed: 721984
   output_root: runs
 hardware:
@@ -10,15 +12,15 @@ hardware:
   memory_soft_limit_fraction: 0.80
   memory_hard_limit_fraction: 0.92
 integrity:
-  cache_logit_tolerance: 0.70
+  cache_logit_tolerance: 3.0
   zero_dose_logit_tolerance: 0.000001
   cache_tolerance_reason: >-
-    Qwen3 4-bit MLX full-sequence and cached decode use different reduction
-    shapes. The five-prompt preflight profile measured a maximum absolute logit
-    drift of 0.625 with identical greedy tokens at every comparison.
+    MLX-VLM Gemma 4 4-bit BF16 full-sequence and cached decode paths use different
+    reduction shapes; the stable profile's measured maximum absolute logit drift
+    is 2.546875 with matching greedy tokens across the preflight prompt set.
 model:
-  adapter: mlx_qwen3
-  repo_id: mlx-community/Qwen3-4B-Instruct-2507-4bit
+  adapter: mlx_gemma4
+  repo_id: mlx-community/gemma-4-e4b-it-4bit
   revision: null
   local_path: null
   trust_remote_code: false
@@ -48,14 +50,14 @@ intervention:
   raw_dose_grid: [0.0, 0.003, 0.01, 0.03, 0.10, 0.30]
   preserve_norm: true
   group_scale: inverse_sqrt_count
-conditions: [baseline, coherent, white, temp_match]
+conditions: [baseline, sham, coherent, white, temp_match]
 data:
   calibration: data/calibration.jsonl
   pilot: data/pilot.jsonl
   confirm: data/confirm.jsonl
   controls: data/controls.jsonl
 execution:
-  generations_per_prompt: 3
+  generations_per_prompt: 5
   batch_size: 1
   randomized_condition_order: true
   save_every: 1

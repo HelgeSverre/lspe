@@ -72,6 +72,7 @@ def test_replay_sampling_is_condition_stratified_and_checks_sham() -> None:
     assert _verify_stored_sham_pairs(raw, paired_plan) == [
         "Stored baseline/sham outputs differ: p:0"
     ]
+    assert _verify_stored_sham_pairs(raw, paired_plan, require_sham=False) == []
 
 
 def test_replay_refuses_missing_run_artifacts(tmp_path: Path) -> None:

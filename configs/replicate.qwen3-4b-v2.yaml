@@ -1,6 +1,6 @@
 schema_version: 1
 experiment:
-  name: qwen3-4b-fallback
+  name: qwen3-4b-architecture-replication-v2
   phase: replicate
   master_seed: 721984
   output_root: runs
@@ -43,8 +43,10 @@ intervention:
   kernel: spherical_rotation
   timing: decode_only
   direction_mode: coherent_per_layer
-  selected_layers: auto
-  target_kl_nats: 0.10
+  # Qwen has 36 decoder layers; this is its middle-depth counterpart to the
+  # selected middle Gemma layer, and is fixed before calibration.
+  selected_layers: [18]
+  target_kl_nats: 0.01
   raw_dose_grid: [0.0, 0.003, 0.01, 0.03, 0.10, 0.30]
   preserve_norm: true
   group_scale: inverse_sqrt_count

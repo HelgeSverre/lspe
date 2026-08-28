@@ -1,6 +1,6 @@
 schema_version: 1
 experiment:
-  name: qwen3-4b-fallback
+  name: qwen3-4b-architecture-replication-v3
   phase: replicate
   master_seed: 721984
   output_root: runs
@@ -43,9 +43,11 @@ intervention:
   kernel: spherical_rotation
   timing: decode_only
   direction_mode: coherent_per_layer
-  selected_layers: auto
-  target_kl_nats: 0.10
-  raw_dose_grid: [0.0, 0.003, 0.01, 0.03, 0.10, 0.30]
+  selected_layers: [18]
+  target_kl_nats: 0.01
+  # V2 established that 0.30 reaches only KL 0.00673; this bounded rescue
+  # bracket refines around the preregistered 0.01 target without changing it.
+  raw_dose_grid: [0.30, 0.35, 0.40, 0.45, 0.50, 0.60]
   preserve_norm: true
   group_scale: inverse_sqrt_count
 conditions: [baseline, coherent, white, temp_match]
