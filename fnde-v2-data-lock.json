@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "stage": "pre_telemetry_data_lock",
+  "protocol_amendment": "FNDE_V2_AMENDMENT.md",
+  "protocol_amendment_sha256": "ed5029f5f45fe9fcacfdf29ac00b5511adcf1cbcf7414505256b79b17ad502ef",
+  "network_map_v2": "data/phase2/network_map_v2.jsonl",
+  "network_map_v2_sha256": "58bd296bade584105f9dcfbc2dc74b364868b857545ceb71d81c24b0b8060f93",
+  "prompt_count": 240,
+  "observations_per_prompt": 4,
+  "expected_observation_rows": 960,
+  "leakage_audit": {
+    "comparison_prompt_count": 596,
+    "normalized_duplicates": 0,
+    "maximum_character_similarity": 0.528,
+    "threshold": 0.92,
+    "passed": true
+  },
+  "stability_thresholds_changed_from_v1": false,
+  "telemetry_collected": false
+}
