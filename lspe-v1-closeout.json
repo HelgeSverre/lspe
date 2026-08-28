@@ -34,6 +34,22 @@
     "confirm": "2cfee5b7a29fb5e38d035715245dda975e0efead9566669763715244a7996059",
     "controls": "d2609c6d9ab86598f0c941163af83d641b36cab9be0302a821fb82a42288c190"
   },
+  "phase2_data_hashes": {
+    "network_map": "acd3b4f033ca2355c06be4c6791b4c08409c82a5eadbb0589384ec582841513b",
+    "causal_map": "a2bf62dd1d2981fb699e6fdf7861aaad5329df33e049f48dfefb2f07e73ffc17",
+    "calibration": "1cdd9735f0a169bc101b24d7db22729b4a64acb85f29eac6a1f2bcddd51530e8",
+    "pilot": "cc25266f493ab927d4fe5bd8a6cc980eba6aa86286febc85707ffa3c7b86f7d6",
+    "confirm": "3a32176e3f29cf7df04e7abdc3408383adb3a7ccfb27034f27fb5b219b01fe5a",
+    "replication": "1b1d7637acfee977f06361d75f168956b2c1bbf6052464891175bde1c821eb8a",
+    "controls": "b5e71c733a726c7280ccf8076f47eae1224e8dd610b7e3faecbe43bd945bc33c"
+  },
+  "phase2_leakage_audit": {
+    "prompt_count": 440,
+    "normalized_duplicates": 0,
+    "maximum_cross_split_character_similarity": 0.8,
+    "threshold": 0.92,
+    "passed": true
+  },
   "conclusions": {
     "h1": "NOT_SUPPORTED",
     "h2": "NOT_SUPPORTED",
@@ -47,6 +63,6 @@
     "reports_and_checksums_complete": true,
     "source_commit_recorded": true,
     "phase2_prompts_not_used_for_v1": true,
-    "phase2_data_frozen": false
+    "phase2_data_frozen": true
   }
 }
