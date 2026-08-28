@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "status": "MECHANISM_NOT_ACHIEVED",
+  "stage_reached": "functional_mapping",
+  "run_id": "fnde-network-map-qwen3-61e90a4",
+  "mapping_source_commit": "ebdaf6687f2a311809d5a80dbda7f2de4388c224",
+  "audit_source_commit": "93dc1e15b981f1fd5815f33bf948a1f26ca5762c",
+  "model_revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+  "network_map_sha256": "acd3b4f033ca2355c06be4c6791b4c08409c82a5eadbb0589384ec582841513b",
+  "total_heads": 1152,
+  "eligible_heads": 760,
+  "primary_density": 0.02,
+  "primary_community_count": 7,
+  "primary_modularity": 0.19059162346330677,
+  "primary_split_half_ari": 0.3497882887224377,
+  "required_split_half_ari": 0.7,
+  "nested_selection": {
+    "density": 0.1,
+    "community_count": 5,
+    "tuning_ari": 0.8583759923209322,
+    "heldout_ari": 0.6603556299079794,
+    "decision": "STOP_MAPPING_UNSTABLE"
+  },
+  "later_stages_executed": false,
+  "verification_passed": true,
+  "checksums_manifest_sha256": "716cfdb25b01c31c4db48b95f05af443f4d9d949d9daee847d13b8d35fd9f769",
+  "local_report_sha256": "3c94ba9d0482d0c6c5ba3a782dc8b34687ca891cf31939f8fe473c959bedc1d6",
+  "mapping_feasibility_sha256": "20581dbe469943a246893441604123e10fd5647d602a06d4c66d63b4306d8541"
+}

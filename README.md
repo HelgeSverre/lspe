@@ -102,17 +102,22 @@ randomness and broken inference:
 The desired output is not a gallery of amusing hallucinations. It is a
 reproducible answer—even when the answer is "no."
 
-## Where this goes next
+## The network experiment
 
-The current experiment perturbs one residual stream. A more ambitious follow-up
-will test something closer to the motivating idea: temporarily weakening the
-model's normal functional boundaries and increasing communication between
-normally separated groups of attention heads.
+The more ambitious follow-up has now run. It tried to map something closer to
+functional networks across all 1,152 attention heads in Qwen3 4B before
+temporarily increasing communication across their boundaries.
 
-That protocol is specified in [NETWORK_DESEGREGATION_SPEC.md](NETWORK_DESEGREGATION_SPEC.md).
-The present experiment is formally closed. Any follow-up should be treated as a
-new, separately preregistered study rather than a reinterpretation of this
-negative result.
+It stopped at the first major gate. The graph looked non-random and recovered
+seven apparent communities, but the partition was not stable across prompt
+splits: ARI `0.350` against a required `0.700`. A nested density audit improved
+the tuning score to `0.858`, then scored only `0.660` on untouched mapping
+folds. So the model never received the network-level intervention.
+
+See [FNDE_REPORT.md](FNDE_REPORT.md) for the full result and
+[NETWORK_DESEGREGATION_SPEC.md](NETWORK_DESEGREGATION_SPEC.md) for the protocol.
+This is a useful failure: it prevents a fragile clustering from being dressed
+up as evidence that the model's “brain networks” were desegregated.
 
 ## Setup
 
