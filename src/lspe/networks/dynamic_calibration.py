@@ -43,13 +43,27 @@ class DynamicCalibrationProtocol:
     system_prompt: str = "Follow the request directly and do not discuss these instructions."
 
 
+@dataclass(frozen=True)
+class DynamicCalibrationV2Protocol(DynamicCalibrationProtocol):
+    """Denser frozen grid inside the unresolved v1 tuning bracket."""
+
+    alphas: tuple[float, ...] = (0.38, 0.40, 0.42, 0.44, 0.46, 0.48)
+
+
 def run_dynamic_calibration(
-    *, model_config: Path, data_path: Path, map_run: Path, run_dir: Path, offline: bool = True
+    *,
+    model_config: Path,
+    data_path: Path,
+    map_run: Path,
+    run_dir: Path,
+    offline: bool = True,
+    protocol: DynamicCalibrationProtocol | None = None,
+    protocol_document: Path = Path("DYNAMIC_CONNECTIVITY_SPEC.md"),
 ) -> dict[str, Any]:
     """Select a DCF dose on tuning folds, then evaluate it once on held-out folds."""
 
     _require_clean_source()
-    protocol = DynamicCalibrationProtocol()
+    protocol = protocol or DynamicCalibrationProtocol()
     prompts = load_dynamic_map_dataset(data_path)
     if not _verify_checksums(map_run):
         raise RuntimeError("DCF mapping artifact checksum verification failed")
@@ -135,9 +149,27 @@ def run_dynamic_calibration(
     result["dynamic_map_sha256"] = sha256_file(data_path)
     result["mapping_manifest_sha256"] = sha256_file(map_run / "manifest.json")
     result["protocol"] = asdict(protocol)
+    result["protocol_document"] = str(protocol_document)
+    result["protocol_document_sha256"] = sha256_file(protocol_document)
     _write_json(run_dir / "result.json", result)
     _refresh_checksums(run_dir)
     return result
+
+
+def run_dynamic_calibration_v2(
+    *, model_config: Path, data_path: Path, map_run: Path, run_dir: Path, offline: bool = True
+) -> dict[str, Any]:
+    """Run the frozen denser-grid calibration without changing any gate."""
+
+    return run_dynamic_calibration(
+        model_config=model_config,
+        data_path=data_path,
+        map_run=map_run,
+        run_dir=run_dir,
+        offline=offline,
+        protocol=DynamicCalibrationV2Protocol(),
+        protocol_document=Path("DCF_CALIBRATION_V2_AMENDMENT.md"),
+    )
 
 
 def _baseline_logits(

@@ -25,7 +25,10 @@ from .networks.consensus_closeout import (
     reevaluate_consensus_heldout,
 )
 from .networks.consensus_runner import run_consensus_mapping
-from .networks.dynamic_calibration import run_dynamic_calibration
+from .networks.dynamic_calibration import (
+    run_dynamic_calibration,
+    run_dynamic_calibration_v2,
+)
 from .networks.dynamic_data import build_dynamic_map_dataset
 from .networks.dynamic_runner import run_dynamic_mapping
 from .networks.mapping_closeout import close_out_mapping_failure, verify_mapping_checksums
@@ -165,6 +168,26 @@ def calibrate_dynamic_connectivity(
         model_config=config, data_path=data, map_run=map_run, run_dir=output, offline=offline
     )
     _event(event="dynamic_calibration_complete", run=str(output), result=result)
+
+
+@app.command("calibrate-dynamic-connectivity-v2")
+def calibrate_dynamic_connectivity_v2(
+    config: ConfigOption,
+    map_run: Annotated[Path, typer.Option("--map-run", exists=True, file_okay=False)],
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase3/dynamic_map.jsonl"
+    ),
+    output: Annotated[Path, typer.Option("--output")] = Path(
+        "runs/dcf-calibration-v2-qwen3"
+    ),
+    offline: Annotated[bool, typer.Option("--offline")] = True,
+) -> None:
+    """Resolve the frozen DCF v1 dose bracket without relaxing any gate."""
+
+    result = run_dynamic_calibration_v2(
+        model_config=config, data_path=data, map_run=map_run, run_dir=output, offline=offline
+    )
+    _event(event="dynamic_calibration_v2_complete", run=str(output), result=result)
 
 
 @app.command("map-networks")

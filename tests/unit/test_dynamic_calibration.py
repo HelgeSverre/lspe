@@ -2,6 +2,7 @@ import numpy as np
 
 from lspe.networks.dynamic_calibration import (
     DynamicCalibrationProtocol,
+    DynamicCalibrationV2Protocol,
     _categorical_kl,
     _eligible,
 )
@@ -29,3 +30,10 @@ def test_dose_eligibility_requires_every_frozen_gate() -> None:
     assert _eligible(summary, protocol)
     summary["median_output_kl"] = 0.081
     assert not _eligible(summary, protocol)
+
+
+def test_v2_changes_only_the_candidate_grid() -> None:
+    first = DynamicCalibrationProtocol()
+    second = DynamicCalibrationV2Protocol()
+    first_values = first.__dict__ | {"alphas": second.alphas}
+    assert first_values == second.__dict__
