@@ -20,6 +20,10 @@ from .human_review import export_human_review
 from .judge import judge_run, reparse_judge_run
 from .locking import create_experiment_lock, load_experiment_lock, write_experiment_lock
 from .models.factory import create_adapter
+from .networks.consensus_closeout import (
+    close_out_consensus_v2,
+    reevaluate_consensus_heldout,
+)
 from .networks.consensus_runner import run_consensus_mapping
 from .networks.mapping_closeout import close_out_mapping_failure, verify_mapping_checksums
 from .networks.mapping_runner import MappingProtocol, run_functional_mapping
@@ -150,6 +154,32 @@ def map_networks_v2(
         model_config=config, data_path=data, run_dir=output, offline=offline
     )
     _event(event="consensus_mapping_complete", run=str(output), result=result["result"])
+
+
+@app.command("reevaluate-networks-v2")
+def reevaluate_networks_v2(
+    run: RunOption,
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase2/network_map_v2.jsonl"
+    ),
+) -> None:
+    """Apply the frozen v2 held-out coverage clarification."""
+
+    result = reevaluate_consensus_heldout(run, data)
+    _event(event="consensus_heldout_reevaluated", run=str(run), result=result)
+
+
+@app.command("closeout-networks-v2")
+def closeout_networks_v2(
+    run: RunOption,
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase2/network_map_v2.jsonl"
+    ),
+) -> None:
+    """Verify and close an FNDE v2 consensus mapping stop."""
+
+    result = close_out_consensus_v2(run, data)
+    _event(event="consensus_v2_closeout_complete", run=str(run), result=result)
 
 
 @app.command("map-sensitivity")
