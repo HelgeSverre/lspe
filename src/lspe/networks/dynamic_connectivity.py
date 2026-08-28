@@ -49,9 +49,7 @@ def regularized_head_correlation(
     coefficient = _oas_identity_shrinkage(samples) if shrinkage is None else shrinkage
     if not 0.0 <= coefficient <= 1.0:
         raise ValueError("Shrinkage must be in [0, 1]")
-    regularized = (1.0 - coefficient) * empirical + coefficient * np.eye(
-        empirical.shape[0]
-    )
+    regularized = (1.0 - coefficient) * empirical + coefficient * np.eye(empirical.shape[0])
     return regularized, float(coefficient), int(samples.shape[0])
 
 
@@ -139,9 +137,7 @@ class DynamicConnectivityController:
         """Return whether the layer's frozen transform differs from identity."""
 
         transform = self.transforms.get(layer_index)
-        return transform is not None and not np.array_equal(
-            transform, np.eye(transform.shape[0])
-        )
+        return transform is not None and not np.array_equal(transform, np.eye(transform.shape[0]))
 
     def apply_mlx(self, layer_index: int, scores: Any) -> Any:
         """Apply a transform to cached single-query MLX attention scores."""
@@ -158,9 +154,7 @@ class DynamicConnectivityController:
         standardized = (values - means) / mx.maximum(scales, 1e-6)
         mixed = mx.einsum("ij,bjqk->biqk", transform, standardized)
         mixed_means = mx.mean(mixed, axis=-1, keepdims=True)
-        mixed_scales = mx.sqrt(
-            mx.mean(mx.square(mixed - mixed_means), axis=-1, keepdims=True)
-        )
+        mixed_scales = mx.sqrt(mx.mean(mx.square(mixed - mixed_means), axis=-1, keepdims=True))
         restored = (mixed - mixed_means) / mx.maximum(mixed_scales, 1e-6) * scales + means
         mx.eval(standardized, restored)
         before = np.asarray(standardized[0, :, 0, :], dtype=np.float32)
@@ -168,9 +162,7 @@ class DynamicConnectivityController:
             ((restored - means) / mx.maximum(scales, 1e-6))[0, :, 0, :],
             dtype=np.float32,
         )
-        self.records.append(
-            {"layer": layer_index, "before": before, "after": after_standardized}
-        )
+        self.records.append({"layer": layer_index, "before": before, "after": after_standardized})
         return restored.astype(scores.dtype)
 
 
@@ -229,9 +221,8 @@ class DynamicCorrelationObserver:
                     raise RuntimeError(f"No DCF observations for fold {fold}, layer {layer}")
                 empirical = self.sums[fold, layer] / count
                 coefficient = oas_shrinkage_from_correlation(empirical, count)
-                result[fold, layer] = (
-                    (1.0 - coefficient) * empirical
-                    + coefficient * np.eye(self.head_count)
+                result[fold, layer] = (1.0 - coefficient) * empirical + coefficient * np.eye(
+                    self.head_count
                 )
         return result
 
@@ -249,6 +240,90 @@ class DynamicCorrelationObserver:
         self.steps[...] = steps
 
 
+@dataclass
+class DynamicMechanismController:
+    """Apply DCF while accumulating compact before/after correlation telemetry."""
+
+    transforms: dict[int, np.ndarray]
+    minimum_keys: int = 8
+    sums_before: dict[int, np.ndarray] = field(default_factory=dict)
+    sums_after: dict[int, np.ndarray] = field(default_factory=dict)
+    counts: dict[int, int] = field(default_factory=dict)
+    maximum_mean_error: float = 0.0
+    maximum_scale_error: float = 0.0
+    nonfinite_count: int = 0
+    zero_variance_count: int = 0
+
+    def has_effect(self, layer_index: int) -> bool:
+        """Return whether this layer has an active transform."""
+
+        return layer_index in self.transforms
+
+    def apply_mlx(self, layer_index: int, scores: Any) -> Any:
+        """Transform one cached score row and accumulate mechanism statistics."""
+
+        if layer_index not in self.transforms or scores.shape[-2] != 1:
+            return scores
+        if scores.shape[-1] < self.minimum_keys:
+            return scores
+        mx = __import__("mlx.core", fromlist=["array"])
+        values = scores.astype(mx.float32)
+        means = mx.mean(values, axis=-1, keepdims=True)
+        scales = mx.sqrt(mx.mean(mx.square(values - means), axis=-1, keepdims=True))
+        transform = mx.array(self.transforms[layer_index], dtype=mx.float32)
+        standardized = (values - means) / mx.maximum(scales, 1e-6)
+        mixed = mx.einsum("ij,bjqk->biqk", transform, standardized)
+        mixed_means = mx.mean(mixed, axis=-1, keepdims=True)
+        mixed_scales = mx.sqrt(mx.mean(mx.square(mixed - mixed_means), axis=-1, keepdims=True))
+        restored = (mixed - mixed_means) / mx.maximum(mixed_scales, 1e-6) * scales + means
+        after = (restored - means) / mx.maximum(scales, 1e-6)
+        before_gram = standardized[0, :, 0, :] @ standardized[0, :, 0, :].T
+        after_gram = after[0, :, 0, :] @ after[0, :, 0, :].T
+        restored_means = mx.mean(restored, axis=-1, keepdims=True)
+        restored_scales = mx.sqrt(
+            mx.mean(mx.square(restored - restored_means), axis=-1, keepdims=True)
+        )
+        mx.eval(
+            before_gram,
+            after_gram,
+            restored_means,
+            restored_scales,
+            scales,
+            mixed_scales,
+        )
+        before_np = np.asarray(before_gram, dtype=np.float64)
+        after_np = np.asarray(after_gram, dtype=np.float64)
+        if not np.isfinite(before_np).all() or not np.isfinite(after_np).all():
+            self.nonfinite_count += 1
+            raise RuntimeError("Non-finite DCF mechanism telemetry")
+        self.zero_variance_count += int(np.sum(np.asarray(mixed_scales) < 1e-6))
+        self.maximum_mean_error = max(
+            self.maximum_mean_error,
+            float(np.max(np.abs(np.asarray(restored_means) - np.asarray(means)))),
+        )
+        self.maximum_scale_error = max(
+            self.maximum_scale_error,
+            float(np.max(np.abs(np.asarray(restored_scales) - np.asarray(scales)))),
+        )
+        self.sums_before[layer_index] = (
+            self.sums_before.get(layer_index, np.zeros_like(before_np)) + before_np
+        )
+        self.sums_after[layer_index] = (
+            self.sums_after.get(layer_index, np.zeros_like(after_np)) + after_np
+        )
+        self.counts[layer_index] = self.counts.get(layer_index, 0) + int(scores.shape[-1])
+        return restored.astype(scores.dtype)
+
+    def correlations(self) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
+        """Return empirical before and after correlation matrices by layer."""
+
+        if set(self.sums_before) != set(self.transforms):
+            raise RuntimeError("DCF mechanism telemetry is incomplete")
+        before = {layer: self.sums_before[layer] / self.counts[layer] for layer in self.transforms}
+        after = {layer: self.sums_after[layer] / self.counts[layer] for layer in self.transforms}
+        return before, after
+
+
 def _oas_identity_shrinkage(samples: np.ndarray) -> float:
     """Oracle-approximating shrinkage coefficient for an identity target."""
 
@@ -258,9 +333,7 @@ def _oas_identity_shrinkage(samples: np.ndarray) -> float:
     trace = float(np.trace(covariance))
     trace_square = float(np.sum(covariance * covariance))
     numerator = (1.0 - 2.0 / features) * trace_square + trace * trace
-    denominator = (count + 1.0 - 2.0 / features) * (
-        trace_square - trace * trace / features
-    )
+    denominator = (count + 1.0 - 2.0 / features) * (trace_square - trace * trace / features)
     if denominator <= 0.0:
         return 1.0
     return float(np.clip(numerator / denominator, 0.0, 1.0))
@@ -276,9 +349,7 @@ def oas_shrinkage_from_correlation(correlation: np.ndarray, count: int) -> float
     trace = float(np.trace(matrix))
     trace_square = float(np.sum(matrix * matrix))
     numerator = (1.0 - 2.0 / features) * trace_square + trace * trace
-    denominator = (count + 1.0 - 2.0 / features) * (
-        trace_square - trace * trace / features
-    )
+    denominator = (count + 1.0 - 2.0 / features) * (trace_square - trace * trace / features)
     if denominator <= 0.0:
         return 1.0
     return float(np.clip(numerator / denominator, 0.0, 1.0))

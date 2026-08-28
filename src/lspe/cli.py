@@ -25,6 +25,7 @@ from .networks.consensus_closeout import (
     reevaluate_consensus_heldout,
 )
 from .networks.consensus_runner import run_consensus_mapping
+from .networks.dynamic_calibration import run_dynamic_calibration
 from .networks.dynamic_data import build_dynamic_map_dataset
 from .networks.dynamic_runner import run_dynamic_mapping
 from .networks.mapping_closeout import close_out_mapping_failure, verify_mapping_checksums
@@ -146,6 +147,24 @@ def map_dynamic_connectivity(
         model_config=config, data_path=data, run_dir=output, offline=offline
     )
     _event(event="dynamic_mapping_complete", run=str(output), result=result["result"])
+
+
+@app.command("calibrate-dynamic-connectivity")
+def calibrate_dynamic_connectivity(
+    config: ConfigOption,
+    map_run: Annotated[Path, typer.Option("--map-run", exists=True, file_okay=False)],
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase3/dynamic_map.jsonl"
+    ),
+    output: Annotated[Path, typer.Option("--output")] = Path("runs/dcf-calibration-qwen3"),
+    offline: Annotated[bool, typer.Option("--offline")] = True,
+) -> None:
+    """Calibrate DCF on tuning folds and run the untouched mechanism gate."""
+
+    result = run_dynamic_calibration(
+        model_config=config, data_path=data, map_run=map_run, run_dir=output, offline=offline
+    )
+    _event(event="dynamic_calibration_complete", run=str(output), result=result)
 
 
 @app.command("map-networks")
