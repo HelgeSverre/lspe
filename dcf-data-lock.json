@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "FROZEN_BEFORE_TELEMETRY",
+  "source_commit": "dba38b5",
+  "model_repo_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+  "model_revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+  "protocol_path": "DYNAMIC_CONNECTIVITY_SPEC.md",
+  "protocol_sha256": "f1243b6cd1c42da6bfa9885f90d834a68826ee198a43281083d902e1a03fd2bd",
+  "data_path": "data/phase3/dynamic_map.jsonl",
+  "data_sha256": "08578e84e8d67f4b9f23bc900c6fb8748df61e2489e1870313fc8e5530b88459",
+  "prompt_count": 96,
+  "categories": 6,
+  "folds": 4,
+  "prompts_per_category_fold": 4,
+  "comparison_prompt_count": 836,
+  "normalized_duplicates": 0,
+  "maximum_character_similarity": 0.47368421052631576,
+  "nearest_pair": [
+    "dcf-narrative-09",
+    "network-map-v2-narrative-15-a"
+  ],
+  "maximum_similarity_threshold": 0.92,
+  "leakage_audit_passed": true,
+  "telemetry_collected": false
+}
