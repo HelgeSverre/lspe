@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +57,9 @@ def run_nested_mapping_sensitivity(run_dir: Path) -> dict[str, Any]:
     threshold = float(protocol["minimum_split_half_ari"])
     result = {
         "schema_version": 1,
+        "audit_source_commit": subprocess.run(
+            ["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+        ).stdout.strip(),
         "purpose": "mapping_only_feasibility_and_falsification",
         "selection_folds": [0, 2],
         "heldout_folds": [1, 3],

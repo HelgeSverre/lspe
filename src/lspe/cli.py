@@ -20,6 +20,7 @@ from .human_review import export_human_review
 from .judge import judge_run, reparse_judge_run
 from .locking import create_experiment_lock, load_experiment_lock, write_experiment_lock
 from .models.factory import create_adapter
+from .networks.mapping_closeout import close_out_mapping_failure, verify_mapping_checksums
 from .networks.mapping_runner import MappingProtocol, run_functional_mapping
 from .networks.mapping_sensitivity import run_nested_mapping_sensitivity
 from .pilot_selection import select_pilot_candidate, select_pilot_matrix
@@ -137,6 +138,21 @@ def map_sensitivity(run: RunOption) -> None:
 
     result = run_nested_mapping_sensitivity(run)
     _event(event="mapping_sensitivity_complete", run=str(run), result=result)
+
+
+@app.command("closeout-mapping")
+def closeout_mapping(
+    run: RunOption,
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase2/network_map.jsonl"
+    ),
+) -> None:
+    """Verify and report an FNDE run stopped by the functional-map gate."""
+
+    result = close_out_mapping_failure(run, data)
+    if not verify_mapping_checksums(run):
+        raise typer.Exit(code=1)
+    _event(event="mapping_closeout_complete", run=str(run), result=result)
 
 
 @app.command()
