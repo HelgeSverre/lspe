@@ -34,6 +34,7 @@ from .networks.dynamic_runner import run_dynamic_mapping
 from .networks.mapping_closeout import close_out_mapping_failure, verify_mapping_checksums
 from .networks.mapping_runner import MappingProtocol, run_functional_mapping
 from .networks.mapping_sensitivity import run_nested_mapping_sensitivity
+from .networks.selective_connectivity import run_selective_connectivity
 from .pilot_selection import select_pilot_candidate, select_pilot_matrix
 from .preflight import (
     baseline_generation_sanity,
@@ -188,6 +189,30 @@ def calibrate_dynamic_connectivity_v2(
         model_config=config, data_path=data, map_run=map_run, run_dir=output, offline=offline
     )
     _event(event="dynamic_calibration_v2_complete", run=str(output), result=result)
+
+
+@app.command("run-selective-connectivity")
+def selective_connectivity(
+    config: ConfigOption,
+    map_run: Annotated[Path, typer.Option("--map-run", exists=True, file_okay=False)],
+    baseline_run: Annotated[Path, typer.Option("--baseline-run", exists=True, file_okay=False)],
+    data: Annotated[Path, typer.Option("--data", exists=True, readable=True)] = Path(
+        "data/phase3/dynamic_map.jsonl"
+    ),
+    output: Annotated[Path, typer.Option("--output")] = Path("runs/sccf-qwen3"),
+    offline: Annotated[bool, typer.Option("--offline")] = True,
+) -> None:
+    """Run frozen causal mode screening and selective DCF calibration."""
+
+    result = run_selective_connectivity(
+        model_config=config,
+        data_path=data,
+        map_run=map_run,
+        baseline_run=baseline_run,
+        run_dir=output,
+        offline=offline,
+    )
+    _event(event="selective_connectivity_complete", run=str(output), result=result)
 
 
 @app.command("map-networks")

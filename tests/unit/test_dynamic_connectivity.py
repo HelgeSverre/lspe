@@ -8,6 +8,7 @@ from lspe.networks.dynamic_connectivity import (
     matrix_similarity,
     mean_absolute_off_diagonal,
     regularized_head_correlation,
+    selective_flattening_transform,
     standardize_attention_rows,
 )
 
@@ -36,6 +37,21 @@ def test_fractional_whitening_reduces_synthetic_head_correlation() -> None:
     assert count == 400
     assert mean_absolute_off_diagonal(after) < mean_absolute_off_diagonal(before)
     assert effective_rank(after) > effective_rank(before)
+
+
+def test_selective_flattening_changes_only_selected_eigenmode() -> None:
+    correlation = np.array([[1.0, 0.5], [0.5, 1.0]])
+    transform = selective_flattening_transform(correlation, 1.0, frozenset({0}))
+    eigenvalues, eigenvectors = np.linalg.eigh(correlation)
+    in_basis = eigenvectors.T @ transform @ eigenvectors
+    assert in_basis[0, 0] == pytest.approx(eigenvalues[0] ** -0.5)
+    assert in_basis[1, 1] == pytest.approx(1.0)
+    assert abs(in_basis[0, 1]) < 1e-12
+
+
+def test_selective_flattening_rejects_invalid_mode() -> None:
+    with pytest.raises(ValueError, match="Invalid eigenvalue ranks"):
+        selective_flattening_transform(np.eye(3), 0.4, frozenset({3}))
 
 
 def test_matrix_similarity_uses_edges_not_diagonal() -> None:

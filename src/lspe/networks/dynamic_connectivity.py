@@ -70,6 +70,32 @@ def flattening_transform(correlation: np.ndarray, alpha: float) -> np.ndarray:
     return 0.5 * (transform + transform.T)
 
 
+def selective_flattening_transform(
+    correlation: np.ndarray, alpha: float, eigenvalue_ranks: frozenset[int]
+) -> np.ndarray:
+    """Whiten only the selected eigenmodes of a correlation matrix."""
+
+    matrix = np.asarray(correlation, dtype=np.float64)
+    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("Correlation must be square")
+    if not np.isfinite(matrix).all() or not np.allclose(matrix, matrix.T, atol=1e-10):
+        raise ValueError("Correlation must be finite and symmetric")
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError("Alpha must be in [0, 1]")
+    invalid = sorted(eigenvalue_ranks - set(range(matrix.shape[0])))
+    if invalid:
+        raise ValueError(f"Invalid eigenvalue ranks: {invalid}")
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
+    if np.min(eigenvalues) <= 0.0:
+        raise ValueError("Correlation must be positive definite")
+    gains = np.ones_like(eigenvalues)
+    selected = np.array(sorted(eigenvalue_ranks), dtype=np.int64)
+    if selected.size:
+        gains[selected] = eigenvalues[selected] ** (-alpha / 2.0)
+    transform = (eigenvectors * gains) @ eigenvectors.T
+    return 0.5 * (transform + transform.T)
+
+
 def apply_flattening(
     scores: np.ndarray, transform: np.ndarray, epsilon: float = 1e-6
 ) -> np.ndarray:
