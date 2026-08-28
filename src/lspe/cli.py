@@ -25,6 +25,7 @@ from .networks.consensus_closeout import (
     reevaluate_consensus_heldout,
 )
 from .networks.consensus_runner import run_consensus_mapping
+from .networks.dynamic_data import build_dynamic_map_dataset
 from .networks.mapping_closeout import close_out_mapping_failure, verify_mapping_checksums
 from .networks.mapping_runner import MappingProtocol, run_functional_mapping
 from .networks.mapping_sensitivity import run_nested_mapping_sensitivity
@@ -114,6 +115,19 @@ def build_data(
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from error
     _event(event="datasets_built", output=str(output), counts=counts)
+
+
+@app.command("build-dynamic-data")
+def build_dynamic_data(
+    output: Annotated[Path, typer.Option("--output")] = Path(
+        "data/phase3/dynamic_map.jsonl"
+    ),
+    force: Annotated[bool, typer.Option("--force")] = False,
+) -> None:
+    """Build the frozen DCF trajectory-mapping corpus."""
+
+    count = build_dynamic_map_dataset(output, force=force)
+    _event(event="dynamic_dataset_built", output=str(output), count=count)
 
 
 @app.command("map-networks")
