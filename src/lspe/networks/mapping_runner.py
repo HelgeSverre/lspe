@@ -243,26 +243,31 @@ def _build_graph_and_communities(
         array.flush()
     primary = _cka_adjacency(normalized, np.arange(row_count), run_dir / "cka-grams.npy")
     thresholded = density_threshold(primary, protocol.graph_density)
-    if np.any(np.sum(thresholded, axis=1) == 0):
-        raise RuntimeError("MAPPING_GATE_ISOLATED_NODES")
     prompt_rows = np.arange(row_count).reshape(-1, 2)
     halves = (prompt_rows[::2].reshape(-1), prompt_rows[1::2].reshape(-1))
     half_graphs = [
         density_threshold(_cka_adjacency(normalized, rows), protocol.graph_density)
         for rows in halves
     ]
+    eligible = _stable_nonisolated_nodes([thresholded, *half_graphs])
+    if len(eligible) < 3:
+        raise RuntimeError("MAPPING_GATE_TOO_FEW_NONISOLATED_NODES")
+    community_graph = thresholded[np.ix_(eligible, eligible)]
+    community_half_graphs = [graph[np.ix_(eligible, eligible)] for graph in half_graphs]
     candidates: list[dict[str, Any]] = []
     for count in protocol.community_counts:
-        full_labels = spectral_communities(thresholded, count, seed=protocol.master_seed + count)
+        full_labels = spectral_communities(
+            community_graph, count, seed=protocol.master_seed + count
+        )
         half_labels = [
             spectral_communities(graph, count, seed=protocol.master_seed + count)
-            for graph in half_graphs
+            for graph in community_half_graphs
         ]
         candidates.append(
             {
                 "count": count,
                 "split_half_ari": adjusted_rand_index(*half_labels),
-                "modularity": weighted_modularity(thresholded, full_labels),
+                "modularity": weighted_modularity(community_graph, full_labels),
                 "labels": full_labels,
             }
         )
@@ -271,23 +276,26 @@ def _build_graph_and_communities(
     assignment = _bootstrap_assignment_probability(
         run_dir / "cka-grams.npy",
         row_count,
-        thresholded,
+        community_graph,
+        eligible,
         labels,
         protocol,
         selected["count"],
     )
     nulls = degree_preserving_null_modularities(
-        thresholded,
+        community_graph,
         labels,
         samples=protocol.null_samples,
         seed=protocol.master_seed + 991,
     )
     pair_stability = _pair_similarity(raw, prompts)
-    layer_labels = np.repeat(protocol.selected_layers, geometry["attention_heads"])
-    kv_labels = np.tile(
+    all_layer_labels = np.repeat(protocol.selected_layers, geometry["attention_heads"])
+    all_kv_labels = np.tile(
         np.arange(geometry["attention_heads"]) % geometry["kv_heads"],
         len(protocol.selected_layers),
     )
+    layer_labels = all_layer_labels[eligible]
+    kv_labels = all_kv_labels[eligible]
     mixed_layers = sum(
         len(set(labels[layer_labels == layer])) > 1 for layer in protocol.selected_layers
     )
@@ -305,14 +313,30 @@ def _build_graph_and_communities(
         "null_modularity": selected["modularity"] > null_95,
     }
     _write_mapping_projections(
-        protocol, geometry, raw, patterns, rms, primary, thresholded, labels, assignment, run_dir
+        protocol,
+        geometry,
+        raw,
+        patterns,
+        rms,
+        primary,
+        thresholded,
+        eligible,
+        labels,
+        assignment,
+        run_dir,
     )
     communities = {
         "selected_count": selected["count"],
         "labels": {
-            _node_id(protocol, geometry["attention_heads"], node): int(label)
-            for node, label in enumerate(labels)
+            _node_id(protocol, geometry["attention_heads"], int(node)): int(label)
+            for node, label in zip(eligible, labels, strict=True)
         },
+        "eligible_node_count": len(eligible),
+        "isolated_or_unstable_node_count": node_count - len(eligible),
+        "isolated_or_unstable_nodes": [
+            _node_id(protocol, geometry["attention_heads"], int(node))
+            for node in sorted(set(range(node_count)) - set(int(value) for value in eligible))
+        ],
         "candidate_statistics": [
             {key: value for key, value in row.items() if key != "labels"} for row in candidates
         ],
@@ -362,6 +386,7 @@ def _bootstrap_assignment_probability(
     gram_path: Path,
     row_count: int,
     full_graph: np.ndarray,
+    eligible_nodes: np.ndarray,
     full_labels: np.ndarray,
     protocol: MappingProtocol,
     count: int,
@@ -369,7 +394,8 @@ def _bootstrap_assignment_probability(
     rng = np.random.default_rng(protocol.master_seed + 313)
     matches = np.zeros(len(full_labels), dtype=np.float64)
     valid_samples = 0
-    kernels = np.load(gram_path, mmap_mode="r").reshape(len(full_labels), row_count, row_count)
+    all_kernels = np.load(gram_path, mmap_mode="r").reshape(-1, row_count, row_count)
+    kernels = all_kernels[eligible_nodes]
     retained_edges = np.argwhere(np.triu(full_graph > 0, 1))
     for sample in range(protocol.bootstrap_samples):
         prompt_indices = rng.integers(0, row_count // 2, size=row_count // 2)
@@ -455,11 +481,13 @@ def _write_mapping_projections(
     rms: np.ndarray,
     primary: np.ndarray,
     thresholded: np.ndarray,
+    eligible: np.ndarray,
     labels: np.ndarray,
     assignment: np.ndarray,
     run_dir: Path,
 ) -> None:
     head_count = geometry["attention_heads"]
+    eligible_position = {int(node): index for index, node in enumerate(eligible)}
     component_rows = []
     for node in range(raw.shape[0]):
         layer = protocol.selected_layers[node // head_count]
@@ -475,8 +503,15 @@ def _write_mapping_projections(
                 "attention_pattern_entropy": float(
                     np.mean(-np.sum(patterns[node] * np.log(patterns[node] + 1e-12), axis=1))
                 ),
-                "community": int(labels[node]),
-                "assignment_probability": float(assignment[node]),
+                "included": node in eligible_position,
+                "community": (
+                    int(labels[eligible_position[node]]) if node in eligible_position else -1
+                ),
+                "assignment_probability": (
+                    float(assignment[eligible_position[node]])
+                    if node in eligible_position
+                    else None
+                ),
             }
         )
     edge_rows = []
@@ -500,6 +535,20 @@ def _write_mapping_projections(
         )
     write_parquet(run_dir / "component-map.parquet", component_rows)
     write_parquet(run_dir / "functional-graph.parquet", edge_rows)
+
+
+def _stable_nonisolated_nodes(graphs: list[np.ndarray]) -> np.ndarray:
+    """Return the fixed point of nodes connected in full and both split graphs."""
+
+    eligible = np.arange(graphs[0].shape[0])
+    while True:
+        keep = np.ones(len(eligible), dtype=bool)
+        for graph in graphs:
+            keep &= np.sum(graph[np.ix_(eligible, eligible)], axis=1) > 0
+        updated = eligible[keep]
+        if np.array_equal(updated, eligible):
+            return eligible
+        eligible = updated
 
 
 def _mean_row_cosine(first: np.ndarray, second: np.ndarray) -> float:
